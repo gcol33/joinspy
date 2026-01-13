@@ -1,0 +1,29 @@
+Package: joinspy
+Title: Diagnostic Tools for Data Frame Joins
+Version: 0.1.0
+Authors@R:
+    person("Gilles", "Colling", email = "gilles.colling051@gmail.com", role = c("aut", "cre"))
+Description: Provides diagnostic tools for understanding and debugging data frame
+    joins. Analyzes key columns before joining to detect duplicates, mismatches,
+    encoding issues, and other common problems. Explains unexpected row count
+    changes and provides safe join wrappers with cardinality enforcement.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports:
+    cli,
+    rlang
+Suggests:
+    dplyr,
+    data.table,
+    tibble,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+URL: https://gillescolling.com/joinspy/, https://github.com/gcol33/joinspy
+BugReports: https://github.com/gcol33/joinspy/issues
+Depends:
+    R (>= 4.1)

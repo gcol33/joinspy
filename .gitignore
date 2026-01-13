@@ -1,0 +1,41 @@
+.Rproj.user
+.Rhistory
+.Rdata
+.httr-oauth
+.DS_Store
+.quarto
+inst/doc
+/doc/
+/Meta/
+claude/
+.claude/
+
+# Temporary debug and test scripts
+debug_*.R
+test_*.R
+quick_test.R
+test_runner.R
+
+# Temporary documentation and reports
+BUGFIX_*.md
+FINAL_TEST_REPORT.md
+TEST_SUMMARY.md
+
+# Windows artifacts
+NUL
+
+# Build artifacts
+vignettes/.build.timestamp
+vignettes/*.html
+vignettes/*_files/
+vignettes/*_cache/
+
+# R CMD check directory
+*.Rcheck/
+joinspy.Rcheck/
+
+# Source packages
+*.tar.gz
+
+# CRAN submission file
+CRAN-SUBMISSION

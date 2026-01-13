@@ -1,0 +1,48 @@
+url: https://gillescolling.com/joinspy/
+
+template:
+  bootstrap: 5
+  bootswatch: flatly
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    github:
+      icon: fa-github
+      href: https://github.com/gcol33/joinspy
+      aria-label: GitHub
+
+reference:
+- title: Pre-Join Diagnostics
+  desc: Analyze tables before joining
+  contents:
+  - join_spy
+  - key_check
+  - key_duplicates
+
+- title: Post-Join Diagnostics
+  desc: Understand what happened after a join
+  contents:
+  - join_explain
+  - join_diff
+
+- title: Safe Join Wrappers
+  desc: Joins with built-in diagnostics
+  contents:
+  - join_strict
+  - starts_with("left_join")
+  - starts_with("right_join")
+  - starts_with("inner_join")
+  - starts_with("full_join")
+
+articles:
+- title: Getting Started
+  navbar: ~
+  contents:
+  - introduction
+
+- title: Deep Dives
+  contents:
+  - common-issues
