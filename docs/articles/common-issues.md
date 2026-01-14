@@ -554,7 +554,7 @@ sessionInfo()
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#> [1] joinspy_0.7.0
+#> [1] joinspy_0.7.1
 #> 
 #> loaded via a namespace (and not attached):
 #>  [1] vctrs_0.6.5       cli_3.6.5         knitr_1.51        rlang_1.1.6      

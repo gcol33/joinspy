@@ -32,4 +32,12 @@ customers <- data.frame(id = c("a", "b"), name = c("Alice", "Bob"), stringsAsFac
 
 report <- join_spy(orders, customers, by = "id")
 suggest_repairs(report)
+#> 
+#> ── Suggested Repairs ───────────────────────────────────────────────────────────
+#> x$id <- trimws(x$id)
+#> 
+#> # Standardize case:
+#> x$id <- tolower(x$id)
+#> y$id <- tolower(y$id)
+#> 
 ```

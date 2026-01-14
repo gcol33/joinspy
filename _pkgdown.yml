@@ -58,14 +58,8 @@ reference:
   - check_cartesian
   - analyze_join_chain
 
-- title: Visualization
-  desc: Plot and summarize join diagnostics
-  contents:
-  - plot_venn
-  - plot_summary
-
 - title: S3 Methods
-  desc: Methods for JoinReport objects
+  desc: Methods for JoinReport objects (print, plot, summary)
   contents:
   - print.JoinReport
   - summary.JoinReport

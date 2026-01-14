@@ -57,11 +57,89 @@ orders <- data.frame(id = 1:3, value = c(10, 20, 30))
 customers <- data.frame(id = c(1, 2, 4), name = c("A", "B", "D"))
 
 result <- left_join_spy(orders, customers, by = "id")
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: id
+#> 
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> 
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 2
+#> Keys only in left: 1
+#> Keys only in right: 1
+#> Match rate (left): "66.7%"
+#> 
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 2
+#> left_join: 3
+#> right_join: 3
+#> full_join: 4
+#> 
+#> ℹ Performing "left" join...
+#> ✔ Result: 3 rows (as expected)
 
 # Access the diagnostic report
 attr(result, "join_report")
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: id
+#> 
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> 
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 2
+#> Keys only in left: 1
+#> Keys only in right: 1
+#> Match rate (left): "66.7%"
+#> 
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 2
+#> left_join: 3
+#> right_join: 3
+#> full_join: 4
 
 # Silent mode for pipelines
 result2 <- left_join_spy(orders, customers, by = "id", .quiet = TRUE)
 last_report()  # Access diagnostics afterward
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: id
+#> 
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 3 Unique keys: 3 Duplicate keys: 0 NA keys: 0
+#> 
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 2
+#> Keys only in left: 1
+#> Keys only in right: 1
+#> Match rate (left): "66.7%"
+#> 
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 2
+#> left_join: 3
+#> right_join: 3
+#> full_join: 4
 ```

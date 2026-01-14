@@ -1,3 +1,20 @@
+# joinspy 0.7.1
+
+## API Simplification
+
+- **Removed `plot_venn()`**: Use `plot(report, file = "...")` instead
+- **Removed `plot_summary()`**: Use `summary(report, format = "markdown")` instead
+- **Enhanced `plot()`**: Now accepts `file`, `width`, `height`, `colors` parameters
+- **Enhanced `summary()`**: Now accepts `format` parameter ("data.frame", "text", "markdown")
+
+## CRAN Preparation
+
+- Added `cph` role and ORCID to DESCRIPTION
+- Added `Language: en-US` field
+- Quoted proper nouns in documentation
+
+---
+
 # joinspy 0.7.0
 
 ## Integration & Workflow

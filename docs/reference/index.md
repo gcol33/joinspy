@@ -57,18 +57,9 @@ Cardinality detection and multi-table chains
 - [`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
   : Analyze Multi-Table Join Chain
 
-## Visualization
-
-Plot and summarize join diagnostics
-
-- [`plot_venn()`](https://gillescolling.com/joinspy/reference/plot_venn.md)
-  : Plot Venn Diagram of Key Overlap
-- [`plot_summary()`](https://gillescolling.com/joinspy/reference/plot_summary.md)
-  : Plot Join Summary Table
-
 ## S3 Methods
 
-Methods for JoinReport objects
+Methods for JoinReport objects (print, plot, summary)
 
 - [`print(`*`<JoinReport>`*`)`](https://gillescolling.com/joinspy/reference/print.JoinReport.md)
   : Print Method for JoinReport

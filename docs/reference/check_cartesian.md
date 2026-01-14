@@ -45,4 +45,5 @@ x <- data.frame(id = c(1, 1, 2, 2), val_x = 1:4)
 y <- data.frame(id = c(1, 1, 2, 2), val_y = 1:4)
 
 check_cartesian(x, y, by = "id")
+#> ✔ No Cartesian product risk (expansion factor: 2x)
 ```

@@ -1,4 +1,4 @@
-# Calculate Levenshtein Distance
+# Calculate 'Levenshtein' Distance
 
 Simple implementation for detecting near-matches.
 

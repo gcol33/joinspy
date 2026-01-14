@@ -19,3 +19,4 @@ Useful links:
 ## Author
 
 **Maintainer**: Gilles Colling <gilles.colling051@gmail.com>
+([ORCID](https://orcid.org/0000-0003-3070-6066)) \[copyright holder\]

@@ -20,7 +20,7 @@ Finds keys that almost match (small edit distance).
 
 - max_distance:
 
-  Maximum Levenshtein distance to consider a near-match.
+  Maximum 'Levenshtein' distance to consider a near-match.
 
 - max_candidates:
 

@@ -2,9 +2,13 @@
 
 [![CRAN
 status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
+[![CRAN
+downloads](https://cranlogs.r-pkg.org/badges/grand-total/joinspy)](https://cran.r-project.org/package=joinspy)
+[![Monthly
+downloads](https://cranlogs.r-pkg.org/badges/joinspy)](https://cran.r-project.org/package=joinspy)
 [![R-CMD-check](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml)
-[![Lifecycle:
-experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Codecov test
+coverage](https://codecov.io/gh/gcol33/joinspy/graph/badge.svg)](https://app.codecov.io/gh/gcol33/joinspy)
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -99,12 +103,10 @@ are.
 
 ### Visualization & Logging
 
-- **[`plot()`](https://rdrr.io/r/graphics/plot.default.html)** /
-  **[`plot_venn()`](https://gillescolling.com/joinspy/reference/plot_venn.md)**:
-  Venn diagram of key overlap
-- **[`summary()`](https://rdrr.io/r/base/summary.html)** /
-  **[`plot_summary()`](https://gillescolling.com/joinspy/reference/plot_summary.md)**:
-  Compact metrics table
+- **[`plot()`](https://rdrr.io/r/graphics/plot.default.html)**: Venn
+  diagram of key overlap (with optional `file` param to save)
+- **[`summary()`](https://rdrr.io/r/base/summary.html)**: Compact
+  metrics table (with optional `format` param for text/markdown)
 - **[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)**:
   Write reports to file (text/JSON/RDS)
 - **[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)**:
@@ -212,7 +214,7 @@ report <- join_spy(orders, customers, by = "customer_id")
 plot(report)
 
 # Save to file
-plot_venn(report, file = "overlap.png")
+plot(report, file = "overlap.png")
 ```
 
 ## Documentation

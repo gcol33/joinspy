@@ -1,4 +1,4 @@
-# RStudio Addin: Join Inspector
+# 'RStudio' Addin: Join Inspector
 
 Opens an interactive dialog to explore join diagnostics between two data
 frames in the current R environment.

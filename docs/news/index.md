@@ -1,5 +1,25 @@
 # Changelog
 
+## joinspy 0.7.1
+
+### API Simplification
+
+- **Removed `plot_venn()`**: Use `plot(report, file = "...")` instead
+- **Removed `plot_summary()`**: Use
+  `summary(report, format = "markdown")` instead
+- **Enhanced [`plot()`](https://rdrr.io/r/graphics/plot.default.html)**:
+  Now accepts `file`, `width`, `height`, `colors` parameters
+- **Enhanced [`summary()`](https://rdrr.io/r/base/summary.html)**: Now
+  accepts `format` parameter (“data.frame”, “text”, “markdown”)
+
+### CRAN Preparation
+
+- Added `cph` role and ORCID to DESCRIPTION
+- Added `Language: en-US` field
+- Quoted proper nouns in documentation
+
+------------------------------------------------------------------------
+
 ## joinspy 0.7.0
 
 ### Integration & Workflow
@@ -40,10 +60,9 @@
 
 ### Visualization
 
-- **[`plot_venn()`](https://gillescolling.com/joinspy/reference/plot_venn.md)**:
-  Venn diagram of key overlap with PNG/SVG/PDF export
-- **[`plot_summary()`](https://gillescolling.com/joinspy/reference/plot_summary.md)**:
-  Summary tables in text, markdown, or data.frame format
+- **`plot_venn()`**: Venn diagram of key overlap with PNG/SVG/PDF export
+- **`plot_summary()`**: Summary tables in text, markdown, or data.frame
+  format
 - **S3 integration**:
   [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method for
   JoinReport objects

@@ -54,4 +54,28 @@ analyze_join_chain(
     list(left = "result", right = "regions", by = "region_id")
   )
 )
+#> 
+#> ── Join Chain Analysis ─────────────────────────────────────────────────────────
+#> 
+#> ── Step 1: orders + customers ──
+#> 
+#> Left: 3 rows
+#> Right: 3 rows
+#> Match rate: 100%
+#> Expected result: 3 rows (left join)
+#> ! 1 issue(s) detected
+#> 
+#> 
+#> ── Step 2: result + regions ──
+#> 
+#> Left: 9 rows
+#> Right: 2 rows
+#> Match rate: 100%
+#> Expected result: 9 rows (left join)
+#> ! 1 issue(s) detected
+#> 
+#> 
+#> ── Chain Summary ──
+#> 
+#> ! Total issues across chain: 2
 ```

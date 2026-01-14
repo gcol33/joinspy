@@ -57,7 +57,16 @@ df <- data.frame(
 
 # Find all duplicates
 key_duplicates(df, by = "id")
+#>   id value .n_duplicates
+#> 2  2     b             2
+#> 3  2     c             2
+#> 4  3     d             3
+#> 5  3     e             3
+#> 6  3     f             3
 
 # Find first occurrence only
 key_duplicates(df, by = "id", keep = "first")
+#>   id value .n_duplicates
+#> 2  2     b             2
+#> 4  3     d             3
 ```
