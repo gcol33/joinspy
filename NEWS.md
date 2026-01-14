@@ -1,3 +1,13 @@
+# joinspy 0.7.2
+
+## Testing & Quality
+
+- Improved test coverage from 65% to 94%
+- Added comprehensive tests for all exported and internal functions
+- Added `.covrignore` to exclude untestable Shiny addin from coverage calculation
+
+---
+
 # joinspy 0.7.1
 
 ## API Simplification
