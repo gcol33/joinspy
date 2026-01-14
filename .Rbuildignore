@@ -26,3 +26,4 @@
 ^FINAL_TEST_REPORT\.md$
 ^TEST_SUMMARY\.md$
 ^[Nn][Uu][Ll]$
+^\.covrignore$

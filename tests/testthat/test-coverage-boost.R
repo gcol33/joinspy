@@ -226,6 +226,8 @@ test_that("summary.JoinReport with markdown format", {
 })
 
 test_that("plot.JoinReport saves to PNG", {
+  skip_on_ci()  # Graphics devices can segfault on CI
+
   x <- data.frame(id = 1:5, val = 1:5)
   y <- data.frame(id = 3:7, name = letters[3:7])
   report <- join_spy(x, y, by = "id")
@@ -239,6 +241,8 @@ test_that("plot.JoinReport saves to PNG", {
 })
 
 test_that("plot.JoinReport saves to SVG", {
+  skip_on_ci()  # Graphics devices can segfault on CI
+
   x <- data.frame(id = 1:5, val = 1:5)
   y <- data.frame(id = 3:7, name = letters[3:7])
   report <- join_spy(x, y, by = "id")
@@ -251,6 +255,8 @@ test_that("plot.JoinReport saves to SVG", {
 })
 
 test_that("plot.JoinReport saves to PDF", {
+  skip_on_ci()  # Graphics devices can segfault on CI
+
   x <- data.frame(id = 1:5, val = 1:5)
   y <- data.frame(id = 3:7, name = letters[3:7])
   report <- join_spy(x, y, by = "id")
