@@ -74,31 +74,31 @@ test_that("join_spy includes memory estimates", {
 
 # --- Phase 5: Visualization ---
 
-test_that("plot_venn runs without error", {
+test_that("plot() runs without error", {
   x <- data.frame(id = 1:5, val = 1:5)
   y <- data.frame(id = 3:7, name = letters[3:7])
 
   report <- join_spy(x, y, by = "id")
 
   # Should not error
-  result <- plot_venn(report)
+  result <- plot(report)
 
   expect_equal(result$left_only, 2)
   expect_equal(result$both, 3)
   expect_equal(result$right_only, 2)
 })
 
-test_that("plot_summary returns data frame", {
+test_that("summary() returns data frame with format options", {
   x <- data.frame(id = 1:5, val = 1:5)
   y <- data.frame(id = 3:7, name = letters[3:7])
 
   report <- join_spy(x, y, by = "id")
 
-  result <- plot_summary(report, format = "data.frame")
+  result <- summary(report)
 
   expect_s3_class(result, "data.frame")
-  expect_true("Metric" %in% names(result))
-  expect_true("Value" %in% names(result))
+  expect_true("metric" %in% names(result))
+  expect_true("value" %in% names(result))
 })
 
 

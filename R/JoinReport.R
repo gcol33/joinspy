@@ -137,7 +137,9 @@ is_join_report <- function(x) {
 #' @param object A `JoinReport` object.
 #' @param ... Additional arguments (ignored).
 #'
-#' @return A data frame with key metrics.
+#' @param format Output format: "data.frame" (default), "text", or "markdown".
+#'
+#' @return A data frame with key metrics (or printed output for text/markdown).
 #'
 #' @examples
 #' orders <- data.frame(id = 1:5, val = 1:5)
@@ -145,10 +147,13 @@ is_join_report <- function(x) {
 #'
 #' report <- join_spy(orders, customers, by = "id")
 #' summary(report)
+#' summary(report, format = "markdown")
 #'
 #' @export
-summary.JoinReport <- function(object, ...) {
-  data.frame(
+summary.JoinReport <- function(object, format = c("data.frame", "text", "markdown"), ...) {
+  format <- match.arg(format)
+
+  summary_df <- data.frame(
     metric = c(
       "left_rows", "right_rows",
       "left_unique_keys", "right_unique_keys",
@@ -174,6 +179,30 @@ summary.JoinReport <- function(object, ...) {
     ),
     stringsAsFactors = FALSE
   )
+
+  if (format == "data.frame") {
+    return(summary_df)
+  }
+
+  if (format == "markdown") {
+    cat("| Metric | Value |\n")
+    cat("|--------|-------|\n")
+    for (i in seq_len(nrow(summary_df))) {
+      cat(sprintf("| %s | %s |\n", summary_df$metric[i], summary_df$value[i]))
+    }
+  } else {
+    # Text format
+    max_metric_len <- max(nchar(summary_df$metric))
+    for (i in seq_len(nrow(summary_df))) {
+      cat(sprintf(
+        "%s: %s\n",
+        format(summary_df$metric[i], width = max_metric_len),
+        summary_df$value[i]
+      ))
+    }
+  }
+
+  invisible(summary_df)
 }
 
 #' Plot Method for JoinReport
@@ -181,10 +210,14 @@ summary.JoinReport <- function(object, ...) {
 #' Creates a Venn diagram showing key overlap between tables.
 #'
 #' @param x A `JoinReport` object.
-#' @param type Type of plot: `"venn"` (default) for Venn diagram.
-#' @param ... Additional arguments passed to [plot_venn()].
+#' @param file Optional file path to save the plot (PNG, SVG, or PDF based on extension).
+#'   If NULL (default), displays in the current graphics device.
+#' @param width Width in inches (default 6).
+#' @param height Height in inches (default 5).
+#' @param colors Character vector of length 2 for left and right circle colors.
+#' @param ... Additional arguments (ignored).
 #'
-#' @return Invisibly returns the plot data.
+#' @return Invisibly returns the plot data (left_only, both, right_only counts).
 #'
 #' @examples
 #' orders <- data.frame(id = 1:5, val = 1:5)
@@ -193,12 +226,81 @@ summary.JoinReport <- function(object, ...) {
 #' report <- join_spy(orders, customers, by = "id")
 #' plot(report)
 #'
-#' @seealso [plot_venn()], [plot_summary()]
 #' @export
-plot.JoinReport <- function(x, type = c("venn"), ...) {
-  type <- match.arg(type)
+plot.JoinReport <- function(x, file = NULL, width = 6, height = 5,
+                            colors = c("#4A90D9", "#D94A4A"), ...) {
+  # Get counts
 
-  if (type == "venn") {
-    plot_venn(x, ...)
+  left_only <- x$match_analysis$n_left_only
+  right_only <- x$match_analysis$n_right_only
+  both <- x$match_analysis$n_matched
+
+  total <- left_only + both + right_only
+
+  # Open file device if needed
+  if (!is.null(file)) {
+    ext <- tolower(tools::file_ext(file))
+    if (ext == "png") {
+      grDevices::png(file, width = width, height = height, units = "in", res = 150)
+    } else if (ext == "svg") {
+      grDevices::svg(file, width = width, height = height)
+    } else if (ext == "pdf") {
+      grDevices::pdf(file, width = width, height = height)
+    } else {
+      stop("Unsupported file format. Use .png, .svg, or .pdf", call. = FALSE)
+    }
+    on.exit(grDevices::dev.off(), add = TRUE)
   }
+
+  # Set up plot
+
+  oldpar <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(oldpar), add = TRUE)
+  graphics::par(mar = c(1, 1, 3, 1))
+
+  # Create empty plot
+  graphics::plot.new()
+  graphics::plot.window(xlim = c(-2, 2), ylim = c(-1.5, 1.5))
+
+  # Draw circles with transparency
+  col_left <- grDevices::adjustcolor(colors[1], alpha.f = 0.5)
+  col_right <- grDevices::adjustcolor(colors[2], alpha.f = 0.5)
+
+  # Left circle (centered at -0.5)
+  theta <- seq(0, 2 * pi, length.out = 100)
+  x_left <- -0.5 + cos(theta)
+  y_left <- sin(theta)
+  graphics::polygon(x_left, y_left, col = col_left, border = colors[1], lwd = 2)
+
+  # Right circle (centered at 0.5)
+  x_right <- 0.5 + cos(theta)
+  y_right <- sin(theta)
+  graphics::polygon(x_right, y_right, col = col_right, border = colors[2], lwd = 2)
+
+  # Add labels
+  graphics::text(-1, 0, left_only, cex = 1.5, font = 2)
+  graphics::text(0, 0, both, cex = 1.5, font = 2)
+  graphics::text(1, 0, right_only, cex = 1.5, font = 2)
+
+  # Add legend labels
+  graphics::text(-1.5, -1.3, "Left only", cex = 0.9, col = colors[1])
+  graphics::text(0, -1.3, "Both", cex = 0.9)
+  graphics::text(1.5, -1.3, "Right only", cex = 0.9, col = colors[2])
+
+  # Add title
+  by_str <- paste(x$by, collapse = ", ")
+  graphics::title(main = paste("Key Overlap:", by_str), cex.main = 1.2)
+
+  # Add percentages as subtitle
+  pct_match <- round(x$match_analysis$match_rate * 100, 1)
+  graphics::mtext(
+    paste0("Match rate: ", pct_match, "% | Total unique keys: ", total),
+    side = 3, line = 0.2, cex = 0.8
+  )
+
+  invisible(list(
+    left_only = left_only,
+    both = both,
+    right_only = right_only
+  ))
 }

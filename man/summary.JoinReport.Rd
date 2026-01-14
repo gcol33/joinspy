@@ -4,15 +4,17 @@
 \alias{summary.JoinReport}
 \title{Summary Method for JoinReport}
 \usage{
-\method{summary}{JoinReport}(object, ...)
+\method{summary}{JoinReport}(object, format = c("data.frame", "text", "markdown"), ...)
 }
 \arguments{
 \item{object}{A \code{JoinReport} object.}
 
+\item{format}{Output format: "data.frame" (default), "text", or "markdown".}
+
 \item{...}{Additional arguments (ignored).}
 }
 \value{
-A data frame with key metrics.
+A data frame with key metrics (or printed output for text/markdown).
 }
 \description{
 Returns a compact summary data frame of the join diagnostic report.
@@ -23,5 +25,6 @@ customers <- data.frame(id = 3:7, name = letters[3:7])
 
 report <- join_spy(orders, customers, by = "id")
 summary(report)
+summary(report, format = "markdown")
 
 }

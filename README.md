@@ -75,8 +75,8 @@ These problems are discovered only when downstream analysis breaks. `joinspy` ca
 
 ### Visualization & Logging
 
-- **`plot()`** / **`plot_venn()`**: Venn diagram of key overlap
-- **`summary()`** / **`plot_summary()`**: Compact metrics table
+- **`plot()`**: Venn diagram of key overlap (with optional `file` param to save)
+- **`summary()`**: Compact metrics table (with optional `format` param for text/markdown)
 - **`log_report()`**: Write reports to file (text/JSON/RDS)
 - **`set_log_file()`**: Enable automatic logging
 
@@ -176,7 +176,7 @@ report <- join_spy(orders, customers, by = "customer_id")
 plot(report)
 
 # Save to file
-plot_venn(report, file = "overlap.png")
+plot(report, file = "overlap.png")
 ```
 
 ## Documentation

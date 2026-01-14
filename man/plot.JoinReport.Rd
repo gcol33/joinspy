@@ -4,17 +4,31 @@
 \alias{plot.JoinReport}
 \title{Plot Method for JoinReport}
 \usage{
-\method{plot}{JoinReport}(x, type = c("venn"), ...)
+\method{plot}{JoinReport}(
+  x,
+  file = NULL,
+  width = 6,
+  height = 5,
+  colors = c("#4A90D9", "#D94A4A"),
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{JoinReport} object.}
 
-\item{type}{Type of plot: \code{"venn"} (default) for Venn diagram.}
+\item{file}{Optional file path to save the plot (PNG, SVG, or PDF based on extension).
+If NULL (default), displays in the current graphics device.}
 
-\item{...}{Additional arguments passed to \code{\link[=plot_venn]{plot_venn()}}.}
+\item{width}{Width in inches (default 6).}
+
+\item{height}{Height in inches (default 5).}
+
+\item{colors}{Character vector of length 2 for left and right circle colors.}
+
+\item{...}{Additional arguments (ignored).}
 }
 \value{
-Invisibly returns the plot data.
+Invisibly returns the plot data (left_only, both, right_only counts).
 }
 \description{
 Creates a Venn diagram showing key overlap between tables.
@@ -26,7 +40,4 @@ customers <- data.frame(id = 3:7, name = letters[3:7])
 report <- join_spy(orders, customers, by = "id")
 plot(report)
 
-}
-\seealso{
-\code{\link[=plot_venn]{plot_venn()}}, \code{\link[=plot_summary]{plot_summary()}}
 }
