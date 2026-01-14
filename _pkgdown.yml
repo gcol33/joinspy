@@ -3,11 +3,12 @@ url: https://gillescolling.com/joinspy/
 template:
   bootstrap: 5
   bootswatch: flatly
+  light-switch: true
 
 navbar:
   structure:
     left: [intro, reference, articles, news]
-    right: [search, github]
+    right: [search, lightswitch, github]
   components:
     github:
       icon: fa-github
@@ -32,10 +33,49 @@ reference:
   desc: Joins with built-in diagnostics
   contents:
   - join_strict
-  - starts_with("left_join")
-  - starts_with("right_join")
-  - starts_with("inner_join")
-  - starts_with("full_join")
+  - left_join_spy
+  - right_join_spy
+  - inner_join_spy
+  - full_join_spy
+  - last_report
+
+- title: Auto-Repair
+  desc: Fix common key issues automatically
+  contents:
+  - join_repair
+  - suggest_repairs
+
+- title: Advanced Analysis
+  desc: Cardinality detection and multi-table chains
+  contents:
+  - detect_cardinality
+  - check_cartesian
+  - analyze_join_chain
+
+- title: Visualization
+  desc: Plot and summarize join diagnostics
+  contents:
+  - plot_venn
+  - plot_summary
+
+- title: S3 Methods
+  desc: Methods for JoinReport objects
+  contents:
+  - print.JoinReport
+  - summary.JoinReport
+  - plot.JoinReport
+
+- title: Logging & Audit
+  desc: Log reports for reproducibility
+
+  contents:
+  - log_report
+  - set_log_file
+  - get_log_file
+
+- title: Helpers
+  contents:
+  - is_join_report
 
 articles:
 - title: Getting Started

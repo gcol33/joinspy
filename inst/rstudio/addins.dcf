@@ -1,0 +1,4 @@
+Name: Join Inspector
+Description: Interactively explore join diagnostics for data frames in your environment
+Binding: addin_join_inspector
+Interactive: true

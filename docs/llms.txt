@@ -1,0 +1,371 @@
+# joinspy
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
+[![R-CMD-check](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml)
+[![Lifecycle:
+experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![License:
+MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Diagnostic Tools for Data Frame Joins in R**
+
+The `joinspy` package helps you understand and debug join operations by
+analyzing key columns before and after joins, detecting common issues,
+and explaining unexpected row count changes. Catch problems early
+instead of discovering them when downstream analysis breaks.
+
+## Quick Start
+
+``` r
+
+library(joinspy)
+
+# Pre-join diagnostics
+report <- join_spy(orders, customers, by = "customer_id")
+summary(report)
+
+# Quick pass/fail check
+key_check(orders, customers, by = "customer_id")
+
+# Safe join with cardinality enforcement
+result <- join_strict(orders, customers, by = "customer_id", expect = "1:1")
+
+# Auto-repair common issues
+orders_fixed <- join_repair(orders, by = "customer_id")
+```
+
+## Statement of Need
+
+Joins silently produce unexpected results when:
+
+- **Duplicate keys** cause row multiplication
+- **Trailing whitespace** breaks matches invisibly
+- **Case mismatches** (“ABC” vs “abc”) prevent joins
+- **Encoding issues** make identical-looking strings different
+- **NA values** in keys cause unexpected behavior
+- **Type mismatches** (character “1” vs numeric 1) fail silently
+
+These problems are discovered only when downstream analysis breaks.
+`joinspy` catches them upfront by analyzing keys **before** you join,
+explaining **why** joins misbehave, and showing **where** the problems
+are.
+
+## Features
+
+### Pre-Join Diagnostics
+
+- **[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)**:
+  Comprehensive pre-flight diagnostic report
+- **[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)**:
+  Quick pass/fail key quality assessment
+- **[`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)**:
+  Find and locate duplicate keys
+
+### Post-Join Analysis
+
+- **[`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)**:
+  Explain row count changes after a join
+- **[`join_diff()`](https://gillescolling.com/joinspy/reference/join_diff.md)**:
+  Compare before/after states
+
+### Safe Join Wrappers
+
+- **[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)**:
+  Join with cardinality enforcement (`1:1`, `1:m`, `m:1`, `m:m`)
+- **[`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)**,
+  **[`right_join_spy()`](https://gillescolling.com/joinspy/reference/right_join_spy.md)**,
+  **[`inner_join_spy()`](https://gillescolling.com/joinspy/reference/inner_join_spy.md)**,
+  **[`full_join_spy()`](https://gillescolling.com/joinspy/reference/full_join_spy.md)**:
+  Joins with automatic diagnostics
+- **[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)**:
+  Retrieve diagnostics after silent (`.quiet = TRUE`) joins
+
+### Auto-Repair
+
+- **[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)**:
+  Fix whitespace, case, encoding, empty strings automatically
+- **[`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)**:
+  Generate R code snippets to fix detected issues
+
+### Advanced Analysis
+
+- **[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)**:
+  Determine actual relationship (1:1, 1:m, m:1, m:m)
+- **[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)**:
+  Warn about Cartesian product explosions
+- **[`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)**:
+  Analyze multi-table join sequences
+
+### Visualization & Logging
+
+- **[`plot()`](https://rdrr.io/r/graphics/plot.default.html)** /
+  **[`plot_venn()`](https://gillescolling.com/joinspy/reference/plot_venn.md)**:
+  Venn diagram of key overlap
+- **[`summary()`](https://rdrr.io/r/base/summary.html)** /
+  **[`plot_summary()`](https://gillescolling.com/joinspy/reference/plot_summary.md)**:
+  Compact metrics table
+- **[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)**:
+  Write reports to file (text/JSON/RDS)
+- **[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)**:
+  Enable automatic logging
+
+## Installation
+
+``` r
+
+# Install from CRAN (when available)
+install.packages("joinspy")
+
+# Or install development version from GitHub
+# install.packages("pak")
+pak::pak("gcol33/joinspy")
+```
+
+## Usage Examples
+
+### Pre-Join Diagnostics
+
+``` r
+
+library(joinspy)
+
+orders <- data.frame(
+  customer_id = c("A", "B", "B", "C", "D "),
+  amount = c(100, 200, 150, 300, 50),
+  stringsAsFactors = FALSE
+)
+
+customers <- data.frame(
+  customer_id = c("A", "B", "C", "D", "E"),
+  name = c("Alice", "Bob", "Carol", "David", "Eve"),
+  stringsAsFactors = FALSE
+)
+
+# Full diagnostic report
+report <- join_spy(orders, customers, by = "customer_id")
+
+# Compact summary
+summary(report)
+#>              metric value
+#> 1         left_rows     5
+#> 2        right_rows     5
+#> 3   left_unique_keys    4
+#> 4  right_unique_keys    5
+#> ...
+```
+
+### Cardinality Enforcement
+
+``` r
+
+# Succeeds - 1:1 relationship
+products <- data.frame(id = 1:3, name = c("Widget", "Gadget", "Gizmo"))
+prices <- data.frame(id = 1:3, price = c(10, 20, 30))
+
+join_strict(products, prices, by = "id", expect = "1:1")
+
+# Fails - duplicates violate 1:1
+prices_dup <- data.frame(id = c(1, 1, 2, 3), price = c(10, 15, 20, 30))
+join_strict(products, prices_dup, by = "id", expect = "1:1")
+#> Error: Cardinality violation: expected '1:1' but found '1:m'
+```
+
+### Auto-Repair
+
+``` r
+
+messy <- data.frame(
+  id = c(" A", "B ", "  C  "),
+  value = 1:3,
+  stringsAsFactors = FALSE
+)
+
+# Preview what would be fixed
+join_repair(messy, by = "id", dry_run = TRUE)
+
+# Apply fixes
+fixed <- join_repair(messy, by = "id")
+fixed$id
+#> [1] "A" "B" "C"
+```
+
+### Silent Pipeline Mode
+
+``` r
+
+# Silent join for pipelines
+result <- left_join_spy(orders, customers, by = "customer_id", .quiet = TRUE)
+
+# Access diagnostics afterward
+last_report()$match_analysis$match_rate
+#> [1] 0.8
+```
+
+### Visualization
+
+``` r
+
+report <- join_spy(orders, customers, by = "customer_id")
+
+# Venn diagram
+plot(report)
+
+# Save to file
+plot_venn(report, file = "overlap.png")
+```
+
+## Documentation
+
+- [Getting
+  Started](https://gillescolling.com/joinspy/articles/introduction.html)
+- [Common Join
+  Issues](https://gillescolling.com/joinspy/articles/common-issues.html)
+- [Function
+  Reference](https://gillescolling.com/joinspy/reference/index.html)
+
+## Related Work
+
+- [dplyr](https://dplyr.tidyverse.org/) - The `relationship` argument
+  provides basic cardinality checks
+- [tidylog](https://github.com/elbersb/tidylog) - Logs row count changes
+  (but doesn’t diagnose causes)
+
+`joinspy` fills the gap: it tells you **why** joins misbehave and
+**where** the problems are.
+
+## Support
+
+> “Software is like sex: it’s better when it’s free.” — Linus Torvalds
+
+I’m a PhD student who builds R packages in my free time because I
+believe good tools should be free and open. I started these projects for
+my own work and figured others might find them useful too.
+
+If this package saved you some time, buying me a coffee is a nice way to
+say thanks.
+
+[![Buy Me A
+Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gcol33)
+
+## License
+
+MIT (see the LICENSE.md file)
+
+## Citation
+
+``` bibtex
+@software{joinspy,
+  author = {Colling, Gilles},
+  title = {joinspy: Diagnostic Tools for Data Frame Joins},
+  year = {2025},
+  url = {https://github.com/gcol33/joinspy}
+}
+```
+
+# Package index
+
+## Pre-Join Diagnostics
+
+Analyze tables before joining
+
+- [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+  : Comprehensive Pre-Join Diagnostic Report
+- [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+  : Quick Key Quality Check
+- [`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)
+  : Find Duplicate Keys
+
+## Post-Join Diagnostics
+
+Understand what happened after a join
+
+- [`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)
+  : Explain Row Count Changes After a Join
+- [`join_diff()`](https://gillescolling.com/joinspy/reference/join_diff.md)
+  : Compare Data Frame Before and After Join
+
+## Safe Join Wrappers
+
+Joins with built-in diagnostics
+
+- [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
+  : Strict Join with Cardinality Enforcement
+- [`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)
+  : Left Join with Diagnostics
+- [`right_join_spy()`](https://gillescolling.com/joinspy/reference/right_join_spy.md)
+  : Right Join with Diagnostics
+- [`inner_join_spy()`](https://gillescolling.com/joinspy/reference/inner_join_spy.md)
+  : Inner Join with Diagnostics
+- [`full_join_spy()`](https://gillescolling.com/joinspy/reference/full_join_spy.md)
+  : Full Join with Diagnostics
+- [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
+  : Get the Last Join Report
+
+## Auto-Repair
+
+Fix common key issues automatically
+
+- [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+  : Repair Common Key Issues
+- [`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
+  : Suggest Repair Code
+
+## Advanced Analysis
+
+Cardinality detection and multi-table chains
+
+- [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
+  : Detect Join Relationship Type
+- [`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
+  : Detect Potential Cartesian Product
+- [`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
+  : Analyze Multi-Table Join Chain
+
+## Visualization
+
+Plot and summarize join diagnostics
+
+- [`plot_venn()`](https://gillescolling.com/joinspy/reference/plot_venn.md)
+  : Plot Venn Diagram of Key Overlap
+- [`plot_summary()`](https://gillescolling.com/joinspy/reference/plot_summary.md)
+  : Plot Join Summary Table
+
+## S3 Methods
+
+Methods for JoinReport objects
+
+- [`print(`*`<JoinReport>`*`)`](https://gillescolling.com/joinspy/reference/print.JoinReport.md)
+  : Print Method for JoinReport
+- [`summary(`*`<JoinReport>`*`)`](https://gillescolling.com/joinspy/reference/summary.JoinReport.md)
+  : Summary Method for JoinReport
+- [`plot(`*`<JoinReport>`*`)`](https://gillescolling.com/joinspy/reference/plot.JoinReport.md)
+  : Plot Method for JoinReport
+
+## Logging & Audit
+
+Log reports for reproducibility
+
+- [`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
+  : Log Join Report to File
+- [`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
+  : Configure Automatic Logging
+- [`get_log_file()`](https://gillescolling.com/joinspy/reference/get_log_file.md)
+  : Get Current Log File
+
+## Helpers
+
+- [`is_join_report()`](https://gillescolling.com/joinspy/reference/is_join_report.md)
+  : Check if Object is a JoinReport
+
+# Articles
+
+### Getting Started
+
+- [Getting Started with
+  joinspy](https://gillescolling.com/joinspy/articles/introduction.md):
+
+### Deep Dives
+
+- [Common Join Issues and
+  Solutions](https://gillescolling.com/joinspy/articles/common-issues.md):

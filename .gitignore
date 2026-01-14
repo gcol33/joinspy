@@ -37,5 +37,8 @@ joinspy.Rcheck/
 # Source packages
 *.tar.gz
 
+# Test artifacts
+Rplots.pdf
+
 # CRAN submission file
 CRAN-SUBMISSION

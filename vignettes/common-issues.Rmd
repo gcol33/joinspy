@@ -1,0 +1,312 @@
+---
+title: "Common Join Issues and Solutions"
+author: "Gilles Colling"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Common Join Issues and Solutions}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6,
+  fig.height = 4
+)
+library(joinspy)
+```
+
+## Overview
+
+This vignette catalogs common join problems and shows how joinspy detects and resolves them. Each issue includes detection methods and recommended solutions.
+
+## Issue 1: Duplicate Keys
+
+**Problem**: When one or both tables have duplicate keys, joins multiply rows unexpectedly.
+
+```{r}
+orders <- data.frame(
+  customer_id = c(1, 2, 2, 3),
+  amount = c(100, 50, 75, 200)
+)
+
+addresses <- data.frame(
+  customer_id = c(1, 2, 2, 3),
+  address = c("NYC", "LA", "SF", "Chicago")
+)
+
+join_spy(orders, addresses, by = "customer_id")
+```
+
+**Detection**: `join_spy()` reports duplicate counts and expected row multiplication.
+
+**Solution**: Aggregate or filter duplicates before joining.
+
+```{r}
+key_duplicates(orders, by = "customer_id")
+key_duplicates(addresses, by = "customer_id")
+```
+
+## Issue 2: Whitespace
+
+**Problem**: Invisible leading/trailing spaces prevent matches.
+
+```{r}
+sales <- data.frame(
+  product = c("Widget", "Gadget ", " Gizmo"),
+  units = c(10, 20, 30),
+  stringsAsFactors = FALSE
+)
+
+inventory <- data.frame(
+  product = c("Widget", "Gadget", "Gizmo"),
+  stock = c(100, 200, 300),
+  stringsAsFactors = FALSE
+)
+
+join_spy(sales, inventory, by = "product")
+```
+
+**Detection**: `join_spy()` flags whitespace issues in the Issues section.
+
+**Solution**: Use `join_repair()` or `trimws()`.
+
+```{r}
+sales_fixed <- join_repair(sales, by = "product")
+key_check(sales_fixed, inventory, by = "product")
+```
+
+## Issue 3: Case Mismatches
+
+**Problem**: Keys differ only by case ("ABC" vs "abc").
+
+```{r}
+left <- data.frame(
+  code = c("ABC", "def", "GHI"),
+  value = 1:3,
+  stringsAsFactors = FALSE
+)
+
+right <- data.frame(
+  code = c("abc", "DEF", "ghi"),
+  label = c("A", "D", "G"),
+  stringsAsFactors = FALSE
+)
+
+join_spy(left, right, by = "code")
+```
+
+**Detection**: `join_spy()` detects case mismatches when keys would match if case-insensitive.
+
+**Solution**: Standardize case with `join_repair()`.
+
+```{r}
+repaired <- join_repair(left, right, by = "code", standardize_case = "upper")
+key_check(repaired$x, repaired$y, by = "code")
+```
+
+## Issue 4: NA Keys
+
+**Problem**: NA values in key columns never match (by design in R).
+
+```{r}
+orders <- data.frame(
+  customer_id = c(1, NA, 3, NA),
+  amount = c(100, 200, 300, 400)
+)
+
+customers <- data.frame(
+  customer_id = c(1, 2, 3, NA),
+  name = c("Alice", "Bob", "Carol", "Unknown")
+)
+
+join_spy(orders, customers, by = "customer_id")
+```
+
+**Detection**: `join_spy()` reports NA counts in the Table Summary.
+
+**Solution**: Handle NA values explicitly—remove them or replace with a placeholder.
+
+```{r}
+# Option 1: Remove rows with NA keys
+orders_clean <- orders[!is.na(orders$customer_id), ]
+
+# Option 2: Replace NA with placeholder
+orders$customer_id[is.na(orders$customer_id)] <- -999
+```
+
+## Issue 5: No Matches
+
+**Problem**: Inner join returns zero rows when you expected matches.
+
+```{r}
+system_a <- data.frame(
+  user_id = c("USR001", "USR002", "USR003"),
+  score = c(85, 90, 78),
+  stringsAsFactors = FALSE
+)
+
+system_b <- data.frame(
+  user_id = c("1", "2", "3"),
+  department = c("Sales", "Marketing", "Engineering"),
+  stringsAsFactors = FALSE
+)
+
+report <- join_spy(system_a, system_b, by = "user_id")
+```
+
+**Detection**: Match analysis shows 0% match rate.
+
+**Solution**: Create a mapping table or transform keys to a common format.
+
+```{r}
+# Extract numeric part
+system_a$user_num <- gsub("USR0*", "", system_a$user_id)
+key_check(system_a, system_b, by = c("user_num" = "user_id"))
+```
+
+## Issue 6: Many-to-Many Explosion
+
+**Problem**: Both tables have duplicate keys, causing exponential row growth.
+
+```{r}
+order_items <- data.frame(
+  order_id = c(1, 1, 2, 2, 2),
+  item = c("A", "B", "C", "D", "E")
+)
+
+order_payments <- data.frame(
+  order_id = c(1, 1, 2, 2),
+  payment = c("CC1", "CC2", "Cash", "Check")
+)
+
+report <- join_spy(order_items, order_payments, by = "order_id")
+```
+
+**Detection**: Expected row counts show multiplication (inner join = 10 rows from 9 source rows).
+
+**Solution**: Aggregate one table first, or use `check_cartesian()`.
+
+```{r}
+check_cartesian(order_items, order_payments, by = "order_id")
+```
+
+```{r error = TRUE}
+# Enforce cardinality to catch this
+join_strict(order_items, order_payments, by = "order_id", expect = "1:m")
+```
+
+## Issue 7: Type Mismatches
+
+**Problem**: Keys have different types (numeric vs character).
+```{r}
+orders <- data.frame(
+  product_id = c(1, 2, 3),
+  quantity = c(10, 20, 30)
+)
+
+products <- data.frame(
+  product_id = c("1", "2", "3"),
+  name = c("Widget", "Gadget", "Gizmo"),
+  stringsAsFactors = FALSE
+)
+
+join_spy(orders, products, by = "product_id")
+```
+
+**Detection**: `join_spy()` flags type coercion warnings.
+
+**Solution**: Convert to matching types before joining.
+
+```{r}
+orders$product_id <- as.character(orders$product_id)
+key_check(orders, products, by = "product_id")
+```
+
+## Issue 8: Empty Strings vs NA
+
+**Problem**: Empty strings (`""`) and `NA` behave differently in joins.
+
+```{r}
+left <- data.frame(
+  id = c("A", "", "C"),
+  value = 1:3,
+  stringsAsFactors = FALSE
+)
+
+right <- data.frame(
+  id = c("A", "B", ""),
+  label = c("Alpha", "Beta", "Empty"),
+  stringsAsFactors = FALSE
+)
+
+join_spy(left, right, by = "id")
+```
+
+**Detection**: `join_spy()` warns about empty strings in keys.
+
+**Solution**: Convert empty strings to NA with `join_repair()`.
+
+```{r}
+left_fixed <- join_repair(left, by = "id", empty_to_na = TRUE)
+left_fixed$id
+```
+
+## Using join_strict() for Safety
+
+When you know the expected cardinality, use `join_strict()` to fail fast:
+
+```{r error = TRUE}
+products <- data.frame(id = 1:3, name = c("A", "B", "C"))
+prices <- data.frame(id = c(1, 2, 2, 3), price = c(10, 20, 25, 30))
+
+join_strict(products, prices, by = "id", expect = "1:1")
+```
+
+## Automatic Detection with detect_cardinality()
+
+Let joinspy determine the actual relationship:
+
+```{r}
+orders <- data.frame(id = c(1, 1, 2, 3), item = c("A", "B", "C", "D"))
+customers <- data.frame(id = 1:3, name = c("Alice", "Bob", "Carol"))
+
+detect_cardinality(orders, customers, by = "id")
+```
+
+## Quick Reference
+
+| Issue | Detection | Solution |
+|-------|-----------|----------|
+| Duplicates | `join_spy()`, `key_duplicates()` | Aggregate or filter |
+| Whitespace | `join_spy()`, `key_check()` | `join_repair()`, `trimws()` |
+| Case mismatch | `join_spy()` | `join_repair(standardize_case=)` |
+| NA keys | `join_spy()` Table Summary | Remove or replace |
+| No matches | `join_spy()` Match Analysis | Check key format/mapping |
+| M:M explosion | `join_spy()`, `check_cartesian()` | Aggregate first |
+| Type mismatch | `join_spy()` | Convert types |
+| Empty strings | `join_spy()` | `join_repair(empty_to_na=TRUE)` |
+
+## Troubleshooting Workflow
+
+1. Run `join_spy(x, y, by)` to get a comprehensive diagnostic
+2. Check the Issues section for detected problems
+3. Use `key_duplicates()` to locate specific duplicate rows
+4. Apply `join_repair()` to fix whitespace/case/encoding issues
+5. Use `join_strict()` to enforce expected cardinality
+6. After joining, use `join_explain()` to understand row count changes
+
+## See Also
+
+- `vignette("introduction")` - Getting started guide
+- `?join_spy`, `?key_check`, `?join_repair`, `?join_strict`
+- `?check_cartesian`, `?detect_cardinality`
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

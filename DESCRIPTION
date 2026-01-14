@@ -1,6 +1,6 @@
 Package: joinspy
 Title: Diagnostic Tools for Data Frame Joins
-Version: 0.1.0
+Version: 0.7.0
 Authors@R:
     person("Gilles", "Colling", email = "gilles.colling051@gmail.com", role = c("aut", "cre"))
 Description: Provides diagnostic tools for understanding and debugging data frame
@@ -20,7 +20,9 @@ Suggests:
     tibble,
     testthat (>= 3.0.0),
     knitr,
-    rmarkdown
+    rmarkdown,
+    shiny,
+    miniUI
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 URL: https://gillescolling.com/joinspy/, https://github.com/gcol33/joinspy
