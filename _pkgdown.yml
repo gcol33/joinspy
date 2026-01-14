@@ -2,7 +2,7 @@ url: https://gillescolling.com/joinspy/
 
 template:
   bootstrap: 5
-  bootswatch: flatly
+  bootswatch: sandstone
   light-switch: true
 
 navbar:
