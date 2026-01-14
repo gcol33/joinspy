@@ -56,5 +56,4 @@ customers <- data.frame(id = 3:7, name = letters[3:7])
 
 report <- join_spy(orders, customers, by = "id")
 plot(report)
-
 ```

@@ -80,10 +80,6 @@ customers <- data.frame(id = 1:3, name = c("Alice", "Bob", "Carol"))
 
 # This succeeds (1:1 relationship)
 join_strict(orders, customers, by = "id", expect = "1:1")
-#>   id product  name
-#> 1  1       A Alice
-#> 2  2       B   Bob
-#> 3  3       C Carol
 
 # This would fail if customers had duplicate ids
 if (FALSE) { # \dontrun{

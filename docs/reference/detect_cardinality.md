@@ -38,12 +38,9 @@ Character string: "1:1", "1:m", "m:1", or "m:m".
 x <- data.frame(id = 1:3, val = 1:3)
 y <- data.frame(id = 1:3, name = c("A", "B", "C"))
 detect_cardinality(x, y, "id")
-#> ℹ Detected cardinality: "1:1"
 
 # 1:m relationship
 x <- data.frame(id = 1:3, val = 1:3)
 y <- data.frame(id = c(1, 1, 2, 3), name = c("A1", "A2", "B", "C"))
 detect_cardinality(x, y, "id")
-#> ℹ Detected cardinality: "1:m"
-#> Right duplicates: 1 key(s)
 ```

@@ -40,18 +40,4 @@ after <- data.frame(id = c(1, 2, 2, 3), x = c("a", "b", "b", "c"), y = 1:4
 )
 
 join_diff(before, after)
-#> 
-#> ── Join Diff ───────────────────────────────────────────────────────────────────
-#> 
-#> ── Dimensions ──
-#> 
-#> Before: 3 rows x 2 columns
-#> After: 4 rows x 3 columns
-#> Change: "+1" rows, "+1" columns
-#> 
-#> 
-#> ── Column Changes ──
-#> 
-#> ✔ Added: y
-#> 
 ```
