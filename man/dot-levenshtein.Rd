@@ -2,7 +2,7 @@
 % Please edit documentation in R/string_diagnostics.R
 \name{.levenshtein}
 \alias{.levenshtein}
-\title{Calculate Levenshtein Distance}
+\title{Calculate 'Levenshtein' Distance}
 \usage{
 .levenshtein(s1, s2)
 }

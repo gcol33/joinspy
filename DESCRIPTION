@@ -2,7 +2,10 @@ Package: joinspy
 Title: Diagnostic Tools for Data Frame Joins
 Version: 0.7.0
 Authors@R:
-    person("Gilles", "Colling", email = "gilles.colling051@gmail.com", role = c("aut", "cre"))
+    person("Gilles", "Colling", email = "gilles.colling051@gmail.com",
+           role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0003-3070-6066"))
+Language: en-US
 Description: Provides diagnostic tools for understanding and debugging data frame
     joins. Analyzes key columns before joining to detect duplicates, mismatches,
     encoding issues, and other common problems. Explains unexpected row count

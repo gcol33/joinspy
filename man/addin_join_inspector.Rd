@@ -2,7 +2,7 @@
 % Please edit documentation in R/addin.R
 \name{addin_join_inspector}
 \alias{addin_join_inspector}
-\title{RStudio Addin: Join Inspector}
+\title{'RStudio' Addin: Join Inspector}
 \usage{
 addin_join_inspector()
 }

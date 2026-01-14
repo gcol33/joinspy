@@ -11,7 +11,7 @@
 
 \item{y_keys}{Unique keys from right table.}
 
-\item{max_distance}{Maximum Levenshtein distance to consider a near-match.}
+\item{max_distance}{Maximum 'Levenshtein' distance to consider a near-match.}
 
 \item{max_candidates}{Maximum number of near-match candidates to return.}
 }

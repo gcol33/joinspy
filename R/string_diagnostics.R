@@ -457,7 +457,7 @@
   )
 }
 
-#' Calculate Levenshtein Distance
+#' Calculate 'Levenshtein' Distance
 #'
 #' Simple implementation for detecting near-matches.
 #'
@@ -484,7 +484,7 @@
 #'
 #' @param x_keys Unique keys from left table.
 #' @param y_keys Unique keys from right table.
-#' @param max_distance Maximum Levenshtein distance to consider a near-match.
+#' @param max_distance Maximum 'Levenshtein' distance to consider a near-match.
 #' @param max_candidates Maximum number of near-match candidates to return.
 #' @return A list with near-match information.
 #' @keywords internal
