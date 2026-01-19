@@ -6,7 +6,7 @@
 \alias{joinspy-package}
 \title{joinspy: Diagnostic Tools for Data Frame Joins}
 \description{
-Provides diagnostic tools for understanding and debugging data frame joins. Analyzes key columns before joining to detect duplicates, mismatches, encoding issues, and other common problems. Explains unexpected row count changes and provides safe join wrappers with cardinality enforcement. Concepts and diagnostics build on tidy data principles as described in Wickham (2014) \doi{10.18637/jss.v059.i10}.
+Provides diagnostic tools for understanding and debugging data frame joins. Analyzes key columns before joining to detect duplicates, mismatches, encoding issues, and other common problems. Explains unexpected row count changes and provides safe join wrappers with cardinality enforcement. Concepts and diagnostics build on tidy data principles as described in 'Wickham' (2014) \doi{10.18637/jss.v059.i10}.
 }
 \seealso{
 Useful links:

@@ -1,6 +1,6 @@
 Package: joinspy
 Title: Diagnostic Tools for Data Frame Joins
-Version: 0.7.3
+Version: 0.7.4
 Authors@R:
     person("Gilles", "Colling", email = "gilles.colling051@gmail.com",
            role = c("aut", "cre", "cph"),
@@ -10,7 +10,7 @@ Description: Provides diagnostic tools for understanding and debugging data fram
     joins. Analyzes key columns before joining to detect duplicates, mismatches,
     encoding issues, and other common problems. Explains unexpected row count
     changes and provides safe join wrappers with cardinality enforcement. Concepts
-    and diagnostics build on tidy data principles as described in Wickham (2014)
+    and diagnostics build on tidy data principles as described in 'Wickham' (2014)
     <doi:10.18637/jss.v059.i10>.
 License: MIT + file LICENSE
 Encoding: UTF-8
