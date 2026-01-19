@@ -19,16 +19,13 @@ Sets up automatic logging of all join reports to a specified file.
 When enabled, every \verb{*_join_spy()} call will append its report to the log.
 }
 \examples{
-\dontrun{
-# Enable automatic logging
-set_log_file("joins.log")
+# Enable automatic logging to temp file
+tmp <- tempfile(fileext = ".log")
+old <- set_log_file(tmp)
 
-# All subsequent joins are logged
-left_join_spy(orders, customers, by = "id")
-
-# Disable logging
+# Disable logging and clean up
 set_log_file(NULL)
-}
+unlink(tmp)
 
 }
 \seealso{

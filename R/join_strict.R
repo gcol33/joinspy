@@ -33,12 +33,9 @@
 #' # This succeeds (1:1 relationship)
 #' join_strict(orders, customers, by = "id", expect = "1:1")
 #'
-#' # This would fail if customers had duplicate ids
-#' \dontrun{
+#' # This fails if customers had duplicate ids (wrapped in try to show error)
 #' customers_dup <- data.frame(id = c(1, 1, 2), name = c("A1", "A2", "B"))
-#' join_strict(orders, customers_dup, by = "id", expect = "1:1")
-#' # Error: Expected 1:1 relationship but found 1:many
-#' }
+#' try(join_strict(orders, customers_dup, by = "id", expect = "1:1"))
 #'
 #' @seealso [join_spy()], [left_join_spy()]
 #' @export

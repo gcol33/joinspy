@@ -25,10 +25,10 @@
 #'
 #' report <- join_spy(orders, customers, by = "id")
 #'
-#' # Log to text file
-#' \dontrun{
-#' log_report(report, "join_audit.log", append = TRUE)
-#' }
+#' # Log to temporary file
+#' tmp <- tempfile(fileext = ".log")
+#' log_report(report, tmp, append = TRUE)
+#' unlink(tmp)
 #'
 #' @seealso [join_spy()], [last_report()]
 #' @export
@@ -223,16 +223,13 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
 #' @return Invisibly returns the previous log file setting.
 #'
 #' @examples
-#' \dontrun{
-#' # Enable automatic logging
-#' set_log_file("joins.log")
+#' # Enable automatic logging to temp file
+#' tmp <- tempfile(fileext = ".log")
+#' old <- set_log_file(tmp)
 #'
-#' # All subsequent joins are logged
-#' left_join_spy(orders, customers, by = "id")
-#'
-#' # Disable logging
+#' # Disable logging and clean up
 #' set_log_file(NULL)
-#' }
+#' unlink(tmp)
 #'
 #' @seealso [log_report()], [get_log_file()]
 #' @export

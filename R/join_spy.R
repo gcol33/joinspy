@@ -68,12 +68,10 @@ join_spy <- function(x, y, by, sample = NULL, ...) {
   if (!is.null(sample) && is.numeric(sample) && sample > 0) {
     sample <- as.integer(sample)
     if (nrow(x) > sample) {
-      set.seed(42)  # Reproducible sampling
       x <- x[base::sample(nrow(x), sample), , drop = FALSE]
       sampled <- TRUE
     }
     if (nrow(y) > sample) {
-      set.seed(43)  # Different seed for y
       y <- y[base::sample(nrow(y), sample), , drop = FALSE]
       sampled <- TRUE
     }
