@@ -54,4 +54,19 @@ result <- merge(orders, customers, by = "id", all.x = TRUE)
 
 # Explain why we got more rows than expected
 join_explain(result, orders, customers, by = "id", type = "left")
+#> 
+#> ── Join Explanation ────────────────────────────────────────────────────────────
+#> 
+#> ── Row Counts ──
+#> 
+#> Left table (x): 4 rows
+#> Right table (y): 4 rows
+#> Result: 6 rows
+#> ! Result has 2 more rows than left table
+#> 
+#> 
+#> ── Why the row count changed ──
+#> 
+#> ℹ Both tables have duplicate keys - this causes multiplicative row expansion
+#> ℹ 1 left key(s) have no match in right table
 ```

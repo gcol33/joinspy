@@ -48,6 +48,8 @@ customers <- data.frame(id = c(1, 2, 4), name = c("A", "B", "D"))
 
 # Quick check
 key_check(orders, customers, by = "id")
+#> ! Key check found 1 issue(s):
+#> ✖ Left table has 1 duplicate key(s) (2 rows affected)
 
 # Silent check
 is_ok <- key_check(orders, customers, by = "id", warn = FALSE)

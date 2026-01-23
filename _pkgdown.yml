@@ -1,26 +1,29 @@
 url: https://gillescolling.com/joinspy/
-
 template:
   bootstrap: 5
   bootswatch: sandstone
-  light-switch: true
-
+  light-switch: yes
+  includes:
+    in_header: pkgdown/mathjax-config.html
 navbar:
   structure:
-    left: [intro, reference, get-started, common-issues, news]
+    left: [intro, reference, articles, news]
     right: [search, lightswitch, github]
   components:
-    get-started:
+    intro:
       text: Get Started
-      href: articles/introduction.html
-    common-issues:
-      text: Common Issues
-      href: articles/common-issues.html
+      href: articles/quickstart.html
+    articles:
+      text: Articles
+      menu:
+        - text: "Quick Start"
+          href: articles/quickstart.html
+        - text: "Common Issues"
+          href: articles/common-issues.html
     github:
-      icon: fa-github
+      icon: fab fa-github
       href: https://github.com/gcol33/joinspy
       aria-label: GitHub
-
 reference:
 - title: Pre-Join Diagnostics
   desc: Analyze tables before joining
@@ -28,13 +31,11 @@ reference:
   - join_spy
   - key_check
   - key_duplicates
-
 - title: Post-Join Diagnostics
   desc: Understand what happened after a join
   contents:
   - join_explain
   - join_diff
-
 - title: Safe Join Wrappers
   desc: Joins with built-in diagnostics
   contents:
@@ -44,45 +45,35 @@ reference:
   - inner_join_spy
   - full_join_spy
   - last_report
-
 - title: Auto-Repair
   desc: Fix common key issues automatically
   contents:
   - join_repair
   - suggest_repairs
-
 - title: Advanced Analysis
   desc: Cardinality detection and multi-table chains
   contents:
   - detect_cardinality
   - check_cartesian
   - analyze_join_chain
-
 - title: S3 Methods
   desc: Methods for JoinReport objects (print, plot, summary)
   contents:
   - print.JoinReport
   - summary.JoinReport
   - plot.JoinReport
-
 - title: Logging & Audit
   desc: Log reports for reproducibility
-
   contents:
   - log_report
   - set_log_file
   - get_log_file
-
 - title: Helpers
-  contents:
-  - is_join_report
-
+  contents: is_join_report
 articles:
 - title: Getting Started
   navbar: ~
-  contents:
-  - introduction
-
+  contents: quickstart
 - title: Deep Dives
-  contents:
-  - common-issues
+  navbar: ~
+  contents: common-issues

@@ -78,7 +78,14 @@ orders <- data.frame(
 
 # Dry run to see what would change
 join_repair(orders, by = "id", dry_run = TRUE)
+#> 
+#> ── Repair Preview (Dry Run) ────────────────────────────────────────────────────
+#> 
+#> ── Left table (x) ──
+#> 
+#> ℹ id: trimmed whitespace (2)
 
 # Actually repair
 orders_fixed <- join_repair(orders, by = "id")
+#> ✔ Repaired 2 value(s)
 ```

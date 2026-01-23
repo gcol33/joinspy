@@ -54,8 +54,9 @@ customers <- data.frame(id = c(1, 2, 4), name = c("A", "B", "D"))
 
 report <- join_spy(orders, customers, by = "id")
 
-# Log to text file
-if (FALSE) { # \dontrun{
-log_report(report, "join_audit.log", append = TRUE)
-} # }
+# Log to temporary file
+tmp <- tempfile(fileext = ".log")
+log_report(report, tmp, append = TRUE)
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpA3Fi1l\file3ad8159c14c3.log
+unlink(tmp)
 ```

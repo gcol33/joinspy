@@ -301,7 +301,7 @@ detect_cardinality(orders, customers, by = "id")
 
 ## See Also
 
-- `vignette("introduction")` - Getting started guide
+- `vignette("quickstart")` - Quick start guide
 - `?join_spy`, `?key_check`, `?join_repair`, `?join_strict`
 - `?check_cartesian`, `?detect_cardinality`
 

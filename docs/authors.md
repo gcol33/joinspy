@@ -11,12 +11,12 @@ Source:
 [`DESCRIPTION`](https://github.com/gcol33/joinspy/blob/HEAD/DESCRIPTION)
 
 Colling G (2026). *joinspy: Diagnostic Tools for Data Frame Joins*. R
-package version 0.7.2, <https://gillescolling.com/joinspy/>.
+package version 0.7.4, <https://gillescolling.com/joinspy/>.
 
     @Manual{,
       title = {joinspy: Diagnostic Tools for Data Frame Joins},
       author = {Gilles Colling},
       year = {2026},
-      note = {R package version 0.7.2},
+      note = {R package version 0.7.4},
       url = {https://gillescolling.com/joinspy/},
     }

@@ -519,8 +519,8 @@ detect_cardinality(orders, customers, by = "id")
 
 ## See Also
 
-- [`vignette("introduction")`](https://gillescolling.com/joinspy/articles/introduction.md) -
-  Getting started guide
+- [`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md) -
+  Quick start guide
 - [`?join_spy`](https://gillescolling.com/joinspy/reference/join_spy.md),
   [`?key_check`](https://gillescolling.com/joinspy/reference/key_check.md),
   [`?join_repair`](https://gillescolling.com/joinspy/reference/join_repair.md),
@@ -554,10 +554,10 @@ sessionInfo()
 #> [1] stats     graphics  grDevices utils     datasets  methods   base     
 #> 
 #> other attached packages:
-#> [1] joinspy_0.7.2
+#> [1] joinspy_0.7.4
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] vctrs_0.6.5       cli_3.6.5         knitr_1.51        rlang_1.1.6      
+#>  [1] vctrs_0.7.0       cli_3.6.5         knitr_1.51        rlang_1.1.7      
 #>  [5] xfun_0.55         otel_0.2.0        textshaping_1.0.4 jsonlite_2.0.0   
 #>  [9] glue_1.8.0        htmltools_0.5.9   ragg_1.5.0        sass_0.4.10      
 #> [13] rmarkdown_2.30    evaluate_1.0.5    jquerylib_0.1.4   fastmap_1.2.0    

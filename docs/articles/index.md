@@ -2,8 +2,8 @@
 
 ### Getting Started
 
-- [Getting Started with
-  joinspy](https://gillescolling.com/joinspy/articles/introduction.md):
+- [Quick
+  Start](https://gillescolling.com/joinspy/articles/quickstart.md):
 
 ### Deep Dives
 

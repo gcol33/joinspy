@@ -31,14 +31,13 @@ Invisibly returns the previous log file setting.
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-# Enable automatic logging
-set_log_file("joins.log")
+# Enable automatic logging to temp file
+tmp <- tempfile(fileext = ".log")
+old <- set_log_file(tmp)
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpA3Fi1l\file3ad816a8202f.log
 
-# All subsequent joins are logged
-left_join_spy(orders, customers, by = "id")
-
-# Disable logging
+# Disable logging and clean up
 set_log_file(NULL)
-} # }
+#> ℹ Automatic logging disabled
+unlink(tmp)
 ```
