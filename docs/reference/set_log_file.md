@@ -34,7 +34,7 @@ Invisibly returns the previous log file setting.
 # Enable automatic logging to temp file
 tmp <- tempfile(fileext = ".log")
 old <- set_log_file(tmp)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpA3Fi1l\file3ad816a8202f.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp6jWz1Q\filecab074757c45.log
 
 # Disable logging and clean up
 set_log_file(NULL)

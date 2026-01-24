@@ -1,4 +1,4 @@
-# Common Join Issues and Solutions
+# Common Join Problems
 
 ## Overview
 

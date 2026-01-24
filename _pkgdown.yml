@@ -18,7 +18,7 @@ navbar:
       menu:
         - text: "Quick Start"
           href: articles/quickstart.html
-        - text: "Common Issues"
+        - text: "Common Join Problems"
           href: articles/common-issues.html
     github:
       icon: fab fa-github

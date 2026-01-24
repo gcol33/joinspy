@@ -7,5 +7,5 @@
 
 ### Deep Dives
 
-- [Common Join Issues and
-  Solutions](https://gillescolling.com/joinspy/articles/common-issues.md):
+- [Common Join
+  Problems](https://gillescolling.com/joinspy/articles/common-issues.md):

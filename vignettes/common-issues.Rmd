@@ -1,10 +1,10 @@
 ---
-title: "Common Join Issues and Solutions"
+title: "Common Join Problems"
 author: "Gilles Colling"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Common Join Issues and Solutions}
+  %\VignetteIndexEntry{Common Join Problems}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
