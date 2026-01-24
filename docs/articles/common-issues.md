@@ -503,16 +503,21 @@ detect_cardinality(orders, customers, by = "id")
 ## Troubleshooting Workflow
 
 1.  Run `join_spy(x, y, by)` to get a comprehensive diagnostic
+
 2.  Check the Issues section for detected problems
+
 3.  Use
     [`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)
     to locate specific duplicate rows
+
 4.  Apply
     [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
     to fix whitespace/case/encoding issues
+
 5.  Use
     [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
     to enforce expected cardinality
+
 6.  After joining, use
     [`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)
     to understand row count changes
@@ -521,10 +526,12 @@ detect_cardinality(orders, customers, by = "id")
 
 - [`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md) -
   Quick start guide
+
 - [`?join_spy`](https://gillescolling.com/joinspy/reference/join_spy.md),
   [`?key_check`](https://gillescolling.com/joinspy/reference/key_check.md),
   [`?join_repair`](https://gillescolling.com/joinspy/reference/join_repair.md),
   [`?join_strict`](https://gillescolling.com/joinspy/reference/join_strict.md)
+
 - [`?check_cartesian`](https://gillescolling.com/joinspy/reference/check_cartesian.md),
   [`?detect_cardinality`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
 

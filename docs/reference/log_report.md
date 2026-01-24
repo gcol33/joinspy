@@ -57,6 +57,5 @@ report <- join_spy(orders, customers, by = "id")
 # Log to temporary file
 tmp <- tempfile(fileext = ".log")
 log_report(report, tmp, append = TRUE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp6jWz1Q\filecab015bb2755.log
 unlink(tmp)
 ```

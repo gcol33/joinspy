@@ -13,23 +13,29 @@ happen when you join.
   [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
   and
   [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+
 - Duplicate detection with
   [`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)
+
 - Post-join analysis with
   [`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)
   and
   [`join_diff()`](https://gillescolling.com/joinspy/reference/join_diff.md)
+
 - Safe wrappers:
   [`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md),
   [`right_join_spy()`](https://gillescolling.com/joinspy/reference/right_join_spy.md),
   [`inner_join_spy()`](https://gillescolling.com/joinspy/reference/inner_join_spy.md),
   [`full_join_spy()`](https://gillescolling.com/joinspy/reference/full_join_spy.md)
+
 - Cardinality enforcement with
   [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
+
 - Auto-repair with
   [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
   and
   [`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
+
 - Visualization with
   [`plot()`](https://rdrr.io/r/graphics/plot.default.html) and
   [`summary()`](https://rdrr.io/r/base/summary.html) methods
@@ -48,10 +54,15 @@ pak::pak("gcol33/joinspy")
 joinspy analyzes join keys **before** you join, detecting:
 
 - Duplicate keys (causes row multiplication)
+
 - Whitespace issues (leading/trailing spaces)
+
 - Case mismatches (“ABC” vs “abc”)
+
 - Encoding problems (invisible Unicode characters)
+
 - NA values in keys
+
 - Type mismatches (numeric vs character)
 
 ## Quick Examples
@@ -362,6 +373,7 @@ join_repair(x, y = NULL, by, trim_whitespace = TRUE,
 
 - [`vignette("common-issues")`](https://gillescolling.com/joinspy/articles/common-issues.md) -
   Catalogue of join problems and solutions
+
 - [`?join_spy`](https://gillescolling.com/joinspy/reference/join_spy.md),
   [`?key_check`](https://gillescolling.com/joinspy/reference/key_check.md),
   [`?join_strict`](https://gillescolling.com/joinspy/reference/join_strict.md),

@@ -293,16 +293,23 @@ detect_cardinality(orders, customers, by = "id")
 ## Troubleshooting Workflow
 
 1. Run `join_spy(x, y, by)` to get a comprehensive diagnostic
+
 2. Check the Issues section for detected problems
+
 3. Use `key_duplicates()` to locate specific duplicate rows
+
 4. Apply `join_repair()` to fix whitespace/case/encoding issues
+
 5. Use `join_strict()` to enforce expected cardinality
+
 6. After joining, use `join_explain()` to understand row count changes
 
 ## See Also
 
 - `vignette("quickstart")` - Quick start guide
+
 - `?join_spy`, `?key_check`, `?join_repair`, `?join_strict`
+
 - `?check_cartesian`, `?detect_cardinality`
 
 ## Session Info

@@ -29,11 +29,17 @@ old_par <- par(no.readonly = TRUE)
 **Key features:**
 
 - Pre-join diagnostics with `join_spy()` and `key_check()`
+
 - Duplicate detection with `key_duplicates()`
+
 - Post-join analysis with `join_explain()` and `join_diff()`
+
 - Safe wrappers: `left_join_spy()`, `right_join_spy()`, `inner_join_spy()`, `full_join_spy()`
+
 - Cardinality enforcement with `join_strict()`
+
 - Auto-repair with `join_repair()` and `suggest_repairs()`
+
 - Visualization with `plot()` and `summary()` methods
 
 ## Installation
@@ -49,10 +55,15 @@ pak::pak("gcol33/joinspy")
 joinspy analyzes join keys **before** you join, detecting:
 
 - Duplicate keys (causes row multiplication)
+
 - Whitespace issues (leading/trailing spaces)
+
 - Case mismatches ("ABC" vs "abc")
+
 - Encoding problems (invisible Unicode characters)
+
 - NA values in keys
+
 - Type mismatches (numeric vs character)
 
 ## Quick Examples
@@ -267,6 +278,7 @@ join_repair(x, y = NULL, by, trim_whitespace = TRUE,
 ## See Also
 
 - `vignette("common-issues")` - Catalogue of join problems and solutions
+
 - `?join_spy`, `?key_check`, `?join_strict`, `?join_repair`
 
 ## Session Info

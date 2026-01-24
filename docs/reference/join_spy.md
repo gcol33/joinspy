@@ -98,35 +98,4 @@ customers <- data.frame(
 
 # Get diagnostic report
 join_spy(orders, customers, by = "customer_id")
-#> 
-#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
-#> Join columns: customer_id
-#> 
-#> 
-#> ── Table Summary ──
-#> 
-#> Left table: Rows: 5 Unique keys: 4 Duplicate keys: 1 NA keys: 0
-#> Right table: Rows: 4 Unique keys: 4 Duplicate keys: 0 NA keys: 0
-#> 
-#> 
-#> ── Match Analysis ──
-#> 
-#> Keys in both: 3
-#> Keys only in left: 1
-#> Keys only in right: 1
-#> Match rate (left): "75%"
-#> 
-#> 
-#> ── Issues Detected ──
-#> 
-#> ! Left table has 1 duplicate key(s) affecting 2 rows - may cause row multiplication
-#> ! Left column 'customer_id' has 1 value(s) with leading/trailing whitespace
-#> 
-#> 
-#> ── Expected Row Counts ──
-#> 
-#> inner_join: 4
-#> left_join: 5
-#> right_join: 5
-#> full_join: 6
 ```
