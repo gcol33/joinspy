@@ -7,8 +7,15 @@ template:
     in_header: pkgdown/mathjax-config.html
 navbar:
   structure:
-    left: [intro, reference, articles, news]
-    right: [search, lightswitch, github]
+    left:
+    - intro
+    - reference
+    - articles
+    - news
+    right:
+    - search
+    - lightswitch
+    - github
   components:
     intro:
       text: Get Started
@@ -16,10 +23,10 @@ navbar:
     articles:
       text: Articles
       menu:
-        - text: "Quick Start"
-          href: articles/quickstart.html
-        - text: "Common Join Problems"
-          href: articles/common-issues.html
+      - text: Quick Start
+        href: articles/quickstart.html
+      - text: Common Join Problems
+        href: articles/common-issues.html
     github:
       icon: fab fa-github
       href: https://github.com/gcol33/joinspy

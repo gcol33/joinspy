@@ -548,11 +548,8 @@ sessionInfo()
 #>   LAPACK version 3.12.1
 #> 
 #> locale:
-#> [1] LC_COLLATE=English_United States.utf8 
-#> [2] LC_CTYPE=English_United States.utf8   
-#> [3] LC_MONETARY=English_United States.utf8
-#> [4] LC_NUMERIC=C                          
-#> [5] LC_TIME=English_United States.utf8    
+#> [1] LC_COLLATE=en_US.UTF-8  LC_CTYPE=en_US.UTF-8    LC_MONETARY=en_US.UTF-8
+#> [4] LC_NUMERIC=C            LC_TIME=en_US.UTF-8    
 #> 
 #> time zone: Europe/Luxembourg
 #> tzcode source: internal
@@ -564,7 +561,7 @@ sessionInfo()
 #> [1] joinspy_0.7.4
 #> 
 #> loaded via a namespace (and not attached):
-#>  [1] vctrs_0.7.0       cli_3.6.5         knitr_1.51        rlang_1.1.7      
+#>  [1] vctrs_0.7.1       cli_3.6.5         knitr_1.51        rlang_1.1.7      
 #>  [5] xfun_0.55         otel_0.2.0        textshaping_1.0.4 jsonlite_2.0.0   
 #>  [9] glue_1.8.0        htmltools_0.5.9   ragg_1.5.0        sass_0.4.10      
 #> [13] rmarkdown_2.30    evaluate_1.0.5    jquerylib_0.1.4   fastmap_1.2.0    
