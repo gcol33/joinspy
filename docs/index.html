@@ -113,7 +113,7 @@
 <li>Empty strings matching each other but not <code>NA</code>
 </li>
 </ul>
-<p>No errors, no warnings. Rows drop, and you find out three pipeline stages later when a dashboard goes blank.</p>
+<p>R won’t warn you about any of these. <code><a href="reference/join_spy.html">join_spy()</a></code> catches them before the join runs.</p>
 </div>
 <div class="section level2">
 <h2 id="what-joinspy-does">What joinspy Does<a class="anchor" aria-label="anchor" href="#what-joinspy-does"></a>
@@ -185,8 +185,8 @@
 <div class="section level2">
 <h2 id="also-includes">Also Includes<a class="anchor" aria-label="anchor" href="#also-includes"></a>
 </h2>
-<p>The package ships join wrappers (<code><a href="reference/left_join_spy.html">left_join_spy()</a></code>, <code><a href="reference/inner_join_spy.html">inner_join_spy()</a></code>, etc.) that run diagnostics before joining and attach the report as an attribute. <code><a href="reference/join_strict.html">join_strict()</a></code> enforces cardinality (<code>1:1</code>, <code>1:m</code>, <code>m:1</code>, <code>m:m</code>) and errors on violation. <code><a href="reference/check_cartesian.html">check_cartesian()</a></code> warns before a many-to-many blows up your row count. <code><a href="reference/analyze_join_chain.html">analyze_join_chain()</a></code> handles multi-step A-B-C sequences.</p>
-<p>Joins auto-detect the input class (tibble, data.table, data.frame) and dispatch to the native join engine. Override with <code>backend = "dplyr"</code> or <code>backend = "data.table"</code> if needed.</p>
+<p>The package ships join wrappers (<code><a href="reference/left_join_spy.html">left_join_spy()</a></code>, <code><a href="reference/inner_join_spy.html">inner_join_spy()</a></code>, etc.) that run diagnostics before joining and attach the report as an attribute. <code><a href="reference/join_strict.html">join_strict()</a></code> enforces cardinality (<code>1:1</code>, <code>1:m</code>, <code>m:1</code>, <code>m:m</code>) and errors on violation. <code><a href="reference/check_cartesian.html">check_cartesian()</a></code> flags many-to-many keys that would multiply your row count. <code><a href="reference/analyze_join_chain.html">analyze_join_chain()</a></code> handles multi-step A-B-C sequences.</p>
+<p>Joins work with tibbles, data.tables, and plain data frames.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -204,7 +204,10 @@
 </h2>
 <ul>
 <li><a href="https://gillescolling.com/joinspy/articles/quickstart.html">Getting Started</a></li>
+<li><a href="https://gillescolling.com/joinspy/articles/why-keys-dont-match.html">Why Your Keys Don’t Match</a></li>
 <li><a href="https://gillescolling.com/joinspy/articles/common-issues.html">Common Join Issues</a></li>
+<li><a href="https://gillescolling.com/joinspy/articles/production.html">Joins in Production</a></li>
+<li><a href="https://gillescolling.com/joinspy/articles/backends.html">Working with Backends</a></li>
 <li><a href="https://gillescolling.com/joinspy/reference/index.html">Function Reference</a></li>
 </ul>
 </div>

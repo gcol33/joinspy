@@ -42,8 +42,9 @@ Most join failures come down to string-level problems in keys:
 - `"Johansson"` vs `"Johannson"` (one character off)
 - Empty strings matching each other but not `NA`
 
-No errors, no warnings. Rows drop, and you find out three pipeline
-stages later when a dashboard goes blank.
+R won’t warn you about any of these.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+catches them before the join runs.
 
 ## What joinspy Does
 
@@ -136,13 +137,11 @@ attribute.
 enforces cardinality (`1:1`, `1:m`, `m:1`, `m:m`) and errors on
 violation.
 [`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
-warns before a many-to-many blows up your row count.
+flags many-to-many keys that would multiply your row count.
 [`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
 handles multi-step A-B-C sequences.
 
-Joins auto-detect the input class (tibble, data.table, data.frame) and
-dispatch to the native join engine. Override with `backend = "dplyr"` or
-`backend = "data.table"` if needed.
+Joins work with tibbles, data.tables, and plain data frames.
 
 ## Installation
 
@@ -160,8 +159,14 @@ pak::pak("gcol33/joinspy")
 
 - [Getting
   Started](https://gillescolling.com/joinspy/articles/quickstart.html)
+- [Why Your Keys Don’t
+  Match](https://gillescolling.com/joinspy/articles/why-keys-dont-match.html)
 - [Common Join
   Issues](https://gillescolling.com/joinspy/articles/common-issues.html)
+- [Joins in
+  Production](https://gillescolling.com/joinspy/articles/production.html)
+- [Working with
+  Backends](https://gillescolling.com/joinspy/articles/backends.html)
 - [Function
   Reference](https://gillescolling.com/joinspy/reference/index.html)
 

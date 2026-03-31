@@ -103,47 +103,23 @@ automatically. The diagnostic layer (<code><a href="../reference/join_spy.html">
 <code><a href="../reference/key_check.html">key_check()</a></code>, <code><a href="../reference/join_explain.html">join_explain()</a></code>, and friends) is
 backend-agnostic: it runs the same analysis regardless of what class the
 inputs are.</p>
-<p>This vignette explains how detection works, when to override it, and
-what happens to the output class through the diagnostic-repair-join
-cycle.</p>
+<p>We walk through detection, explicit overrides, and class preservation
+below.</p>
 <div class="section level2">
 <h2 id="auto-detection">Auto-detection<a class="anchor" aria-label="anchor" href="#auto-detection"></a>
 </h2>
-<p>When you call <code><a href="../reference/left_join_spy.html">left_join_spy()</a></code> or
+<p>When we call <code><a href="../reference/left_join_spy.html">left_join_spy()</a></code> or
 <code><a href="../reference/join_strict.html">join_strict()</a></code> without specifying a backend, joinspy
 inspects the class of <code>x</code> and <code>y</code> and picks the
-backend according to a fixed priority:</p>
-<ol style="list-style-type: decimal">
-<li><p>If either input inherits from <code>data.table</code>, use
-data.table. Otherwise, if either input inherits from <code>tbl_df</code>
-(tibble), use dplyr.</p></li>
-<li><p>If neither condition holds, use base R
-<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>.</p></li>
-</ol>
-<p>data.table wins over tibble because data.table’s merge implementation
-has specific expectations about key handling and indexing that cannot be
-replicated through dplyr’s join functions. A data.table joined via dplyr
-loses its keys, its index, and its reference semantics, all properties
-that the caller likely depends on if they chose data.table in the first
-place. dplyr, by contrast, handles a data.table coerced to a tibble
-without issues. So when the two classes conflict, data.table is the
-safer default. When both inputs are plain data frames, base R is the
-only dependency-free option and is always available.</p>
-<p>The detection examines both inputs, not just <code>x</code>.
-Pipelines sometimes pass a tibble on one side and a plain data frame on
-the other (for instance, reading one table from a CSV with
-<code><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv()</a></code> and another with
-<code><a href="https://readr.tidyverse.org/reference/read_delim.html" class="external-link">readr::read_csv()</a></code>). As long as one side is a tibble, dplyr
-is selected, which avoids the subtle differences in column ordering and
-NA handling between <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and
-<code><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">dplyr::left_join()</a></code>.</p>
-<p>What happens when a mixed-class call selects a backend whose package
-is not installed? joinspy falls back to base R and emits a warning. The
-most common trigger is a data.table object lingering in an environment
-where the data.table package was loaded transiently (e.g., via another
-package) but is no longer available. The warning is loud on purpose: a
-silent fallback could change the result’s class and break downstream
-code.</p>
+backend according to a fixed priority: data.table &gt; tibble &gt; base
+R.</p>
+<p>data.table takes priority because its merge implementation depends on
+key handling, indexing, and reference semantics that a dplyr join would
+discard. dplyr, on the other hand, handles a coerced data.table without
+issues. Both inputs are checked – if one side is a tibble and the other
+a plain data frame, dplyr is selected. If a mixed-class call selects a
+backend whose package is not installed, joinspy falls back to base R
+with a warning.</p>
 <p>Here is the detection in action with each input type:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Base R data frames: auto-detects "base"</span></span>
@@ -207,22 +183,14 @@ wins:</p>
 <code>backend</code> argument that overrides auto-detection. The three
 valid values are <code>"base"</code>, <code>"dplyr"</code>, and
 <code>"data.table"</code>.</p>
-<p>When would you use this? A few common scenarios:</p>
-<p><strong>Forcing dplyr on plain data frames.</strong> If you want
-tibble output (with its stricter printing and no partial matching) but
-your inputs are plain data frames, pass
-<code>backend = "dplyr"</code>:</p>
+<p>We can force dplyr on plain data frames to get tibble output:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">orders_df</span>, <span class="va">customers_df</span>, by <span class="op">=</span> <span class="st">"id"</span>,</span>
 <span>                        backend <span class="op">=</span> <span class="st">"dplyr"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">class</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "data.frame"</span></span></code></pre></div>
-<p><strong>Forcing base R to avoid dplyr warnings.</strong> dplyr 1.1.0
-introduced a many-to-many warning for joins that produce Cartesian
-products. If you have already diagnosed the cardinality with
-<code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> or <code><a href="../reference/check_cartesian.html">check_cartesian()</a></code> and
-know the expansion is intentional, you can bypass the dplyr warning by
-forcing <code>backend = "base"</code>:</p>
+<p>Or force base R to sidestep dplyr’s many-to-many warning when we
+already know the expansion is intentional:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># These have a legitimate many-to-many relationship</span></span>
 <span><span class="va">tags</span> <span class="op">&lt;-</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html" class="external-link">tibble</a></span><span class="op">(</span></span>
@@ -240,48 +208,37 @@ forcing <code>backend = "base"</code>:</p>
 <span>                        backend <span class="op">=</span> <span class="st">"base"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
-<p><strong>Forcing data.table for speed on large data.</strong> If you
-have plain data frames with millions of rows, the data.table merge
-engine is substantially faster than base R or dplyr. Passing
-<code>backend = "data.table"</code> triggers the conversion internally;
-the result comes back as a data.table.</p>
+<p>Or force data.table on plain data frames for speed on large
+inputs:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">orders_df</span>, <span class="va">customers_df</span>, by <span class="op">=</span> <span class="st">"id"</span>,</span>
 <span>                        backend <span class="op">=</span> <span class="st">"data.table"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">class</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "data.table" "data.frame"</span></span></code></pre></div>
-<p>Note that the explicit backend must be installed. Requesting
-<code>backend = "dplyr"</code> when dplyr is not installed will error,
-not silently fall back. This is intentional: an explicit choice should
-fail loudly if it cannot be honored. The asymmetry with auto-detection
-(which does fall back silently) is deliberate. Auto-detection is a
-convenience; an explicit override is a contract.</p>
-<p>One more use case worth mentioning: <strong>reproducibility across
-environments.</strong> If your script must produce identical output on a
-colleague’s machine that may or may not have dplyr installed, set
-<code>backend = "base"</code> explicitly. This removes the class of the
-input as a variable and guarantees that the join always uses
-<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>, regardless of whether someone upstream happened to
-return a tibble or a plain data frame.</p>
+<p>An explicit backend must be installed. Requesting
+<code>backend = "dplyr"</code> without dplyr will error, not silently
+fall back – auto-detection is a convenience, but an explicit override is
+a contract.</p>
+<p>Setting <code>backend = "base"</code> is also a way to guarantee
+reproducibility across environments where dplyr may or may not be
+installed.</p>
 </div>
 <div class="section level2">
 <h2 id="class-preservation">Class preservation<a class="anchor" aria-label="anchor" href="#class-preservation"></a>
 </h2>
 <p>joinspy preserves input class through the full diagnostic-repair-join
-cycle. The three stages behave as follows:</p>
+cycle:</p>
 <ul>
 <li>
 <strong>Diagnostics</strong> (<code><a href="../reference/join_spy.html">join_spy()</a></code>,
-<code><a href="../reference/key_check.html">key_check()</a></code>, <code><a href="../reference/join_explain.html">join_explain()</a></code>, etc.) accept any
-data frame subclass and return report objects. They do not modify or
-convert the input data.</li>
+<code><a href="../reference/key_check.html">key_check()</a></code>, etc.) accept any data frame subclass and
+return report objects without modifying the input.</li>
 <li>
-<strong>Repair</strong> (<code><a href="../reference/join_repair.html">join_repair()</a></code>) operates on the
-key columns in place and returns the same class it received.</li>
+<strong>Repair</strong> (<code><a href="../reference/join_repair.html">join_repair()</a></code>) operates on key
+columns in place and returns the same class it received.</li>
 <li>
-<strong>Join wrappers</strong> (<code><a href="../reference/left_join_spy.html">left_join_spy()</a></code>,
-<code><a href="../reference/join_strict.html">join_strict()</a></code>, etc.) dispatch to the native join engine for
-the detected class, so the result matches the input class.</li>
+<strong>Join wrappers</strong> dispatch to the native join engine
+for the detected class.</li>
 </ul>
 <p>Here is a full cycle with base R data frames:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -369,25 +326,17 @@ the detected class, so the result matches the input class.</li>
 <span><span class="co">#&gt; 1:    A-1    10  Alpha</span></span>
 <span><span class="co">#&gt; 2:    B-2    20   Beta</span></span>
 <span><span class="co">#&gt; 3:    C-3    30  Gamma</span></span></code></pre></div>
-<p>One edge case to be aware of: when you use <code><a href="../reference/join_repair.html">join_repair()</a></code>
-with both <code>x</code> and <code>y</code> arguments, it returns a list
-with <code>$x</code> and <code>$y</code>. Each element preserves the
-class of the corresponding input. If <code>x</code> is a tibble and
-<code>y</code> is a plain data frame, you get a tibble in
-<code>$x</code> and a data frame in <code>$y</code>.</p>
-<p>Class preservation also extends to <code><a href="../reference/join_strict.html">join_strict()</a></code>. The
-cardinality check happens before the join, so if the constraint is
-satisfied the result has the same class as the inputs, and if the
-constraint is violated no result is returned at all (the function
-errors). There is no intermediate state where the class might be
-lost.</p>
-<p>The one place where class can change is when you use an explicit
-backend override that does not match the input class. Passing
-<code>backend = "data.table"</code> on a tibble will return a
-data.table, because the data.table merge engine produces data.table
-output. Since you asked for the data.table engine, that is what you get.
-Pass <code>backend = "dplyr"</code> instead if you need a tibble
-back.</p>
+<p>When <code><a href="../reference/join_repair.html">join_repair()</a></code> receives both <code>x</code> and
+<code>y</code>, it returns a list with <code>$x</code> and
+<code>$y</code>, each preserving the class of the corresponding
+input.</p>
+<p><code><a href="../reference/join_strict.html">join_strict()</a></code> also preserves class – the cardinality
+check runs before the join, so a satisfied constraint returns the native
+class and a violated one errors before any output is produced.</p>
+<p>The one exception is an explicit backend override that does not match
+the input class. Passing <code>backend = "data.table"</code> on a tibble
+returns a data.table, because that is what the data.table engine
+produces.</p>
 </div>
 <div class="section level2">
 <h2 id="diagnostics-are-backend-agnostic">Diagnostics are backend-agnostic<a class="anchor" aria-label="anchor" href="#diagnostics-are-backend-agnostic"></a>
@@ -395,14 +344,12 @@ back.</p>
 <p>The diagnostic functions (<code><a href="../reference/join_spy.html">join_spy()</a></code>,
 <code><a href="../reference/key_check.html">key_check()</a></code>, <code><a href="../reference/key_duplicates.html">key_duplicates()</a></code>,
 <code><a href="../reference/join_explain.html">join_explain()</a></code>, <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code>,
-<code><a href="../reference/check_cartesian.html">check_cartesian()</a></code>) operate purely on column values. They do
-not call any join engine. This means they produce identical results
-whether the input is a data frame, tibble, or data.table.</p>
-<p>This separation is useful in practice. You can diagnose with
-<code><a href="../reference/join_spy.html">join_spy()</a></code> on a data.table, then join with dplyr if you
-prefer its output format. Or diagnose in a script where only base R is
-available, then pass the data to a Shiny app that uses dplyr internally.
-The diagnostic report does not carry any backend dependency.</p>
+<code><a href="../reference/check_cartesian.html">check_cartesian()</a></code>) operate purely on column values and
+never call a join engine. They produce identical results regardless of
+input class.</p>
+<p>This means we can diagnose on data.tables and join with dplyr, or
+diagnose in a base-R script and pass the data to a Shiny app that uses
+dplyr internally.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Diagnose on data.tables</span></span>
 <span><span class="va">orders_dt</span> <span class="op">&lt;-</span> <span class="fu">data.table</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/data.table.html" class="external-link">data.table</a></span><span class="op">(</span></span>
@@ -423,65 +370,32 @@ The diagnostic report does not carry any backend dependency.</p>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">orders_tbl</span>, <span class="va">customers_tbl</span>, by <span class="op">=</span> <span class="st">"id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/class.html" class="external-link">class</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "tbl_df"     "tbl"        "data.frame"</span></span></code></pre></div>
-<p>The report from <code><a href="../reference/join_spy.html">join_spy()</a></code> is the same object regardless
-of input class. Its <code>$issues</code>, <code>$expected_rows</code>,
-and <code>$match_analysis</code> fields contain the same values; only
-the join execution step (called separately via the wrappers) depends on
-the backend. This also means you can write unit tests for your key
-quality using plain data frames even if your production code uses
-data.table. The diagnostic output is structurally identical, so
-assertions on <code>report$issues</code> or
-<code>report$match_analysis$match_rate</code> will hold regardless of
-the class used at test time versus production time. You avoid pulling in
-heavy Suggests dependencies just to test key diagnostics.</p>
+<p>The report object is structurally identical across backends –
+<code>$issues</code>, <code>$expected_rows</code>, and
+<code>$match_analysis</code> contain the same values. This also means we
+can write unit tests for key quality using plain data frames even when
+production code uses data.table.</p>
 </div>
 <div class="section level2">
-<h2 id="which-backend-to-choose">Which backend to choose<a class="anchor" aria-label="anchor" href="#which-backend-to-choose"></a>
+<h2 id="backend-differences-at-a-glance">Backend differences at a glance<a class="anchor" aria-label="anchor" href="#backend-differences-at-a-glance"></a>
 </h2>
-<p>joinspy does not have a preferred backend. It respects whatever you
-are already using. Here is a brief orientation for cases where you do
-need to choose.</p>
-<p><strong>Base R</strong> has no dependencies and is always available.
-It uses <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>, which handles all four join types and
-named <code>by</code> vectors for different column names. The output is
-always a plain data frame. Row order is not guaranteed (it depends on
-the key sort), and <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> reorders columns to put the key
-first. For small to medium datasets (up to a few hundred thousand rows),
-base R is perfectly adequate.</p>
-<p><strong>dplyr</strong> is the standard in tidyverse workflows. It
-preserves column order and row order from the left table, returns
-tibbles, and prints compactly. It requires the dplyr package (and
-transitively tibble and several others). Since dplyr 1.1.0, it also
-warns about many-to-many joins, which is helpful as a safety net but can
-be noisy if you have already diagnosed the cardinality with joinspy.</p>
-<p><strong>data.table</strong> is the fastest option for large datasets.
-Its merge implementation is heavily optimized and can handle tens of
-millions of rows efficiently. The tradeoff is reference semantics:
-data.table modifies objects in place in some operations, which can
-surprise users accustomed to R’s copy-on-modify behavior. joinspy’s
-data.table backend uses <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> (not the
-<code>[.data.table</code> join syntax), so it avoids most
-reference-semantic surprises, but the result is still a data.table
-object with data.table’s printing and subsetting behavior.</p>
-<p>A practical consideration: the three backends differ in how they
-handle column name collisions. When <code>x</code> and <code>y</code>
-share non-key column names, base R appends <code>.x</code> and
-<code>.y</code> suffixes, dplyr appends <code>.x</code> and
-<code>.y</code> by default (configurable via <code>suffix</code>), and
-data.table appends <code>i.</code> to the columns from the right table.
-These suffixes affect downstream code that references the merged columns
-by name. If you switch backends mid-project, check that column
-references still resolve correctly.</p>
-<p>Another difference is row ordering. Base R’s <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>
-sorts rows by the key column. dplyr preserves the row order of the left
-table. data.table sorts by key if the tables are keyed, and otherwise
-preserves insertion order. For most analytical workflows the order does
-not matter, but if you are comparing output across backends in tests or
-reproducibility checks, sort the result before comparing.</p>
-<p>The simplest rule: use what your project already depends on. If you
-have no preference, base R is the safest default. If performance
-matters, data.table. If you want tibble output and tidyverse
-compatibility, dplyr.</p>
+<p>The three backends differ in a few ways worth noting:</p>
+<ul>
+<li>
+<strong>Column name collisions.</strong> Base R and dplyr append
+<code>.x</code>/<code>.y</code> suffixes; data.table appends
+<code>i.</code> to right-table columns.</li>
+<li>
+<strong>Row ordering.</strong> Base R sorts by key; dplyr preserves
+left-table order; data.table sorts by key if keyed, otherwise preserves
+insertion order.</li>
+<li>
+<strong>Performance.</strong> data.table is the fastest for large
+inputs. Base R and dplyr are comparable for small to medium
+datasets.</li>
+</ul>
+<p>If we switch backends mid-project, it is worth checking that column
+references and row-order assumptions still hold.</p>
 </div>
 <div class="section level2">
 <h2 id="see-also">See Also<a class="anchor" aria-label="anchor" href="#see-also"></a>

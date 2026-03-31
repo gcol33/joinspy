@@ -399,8 +399,11 @@ join_strict(sensors, readings_dup, by = "sensor_id", expect = "1:1")
 The `expect` argument accepts four cardinality levels:
 
 - `"1:1"`: both sides have unique keys. Any duplicate on either side is an error.
+
 - `"1:m"`: the left table has unique keys, the right may repeat. The classic lookup-table join.
+
 - `"m:1"`: the mirror of `"1:m"`. The right table is the lookup.
+
 - `"m:m"`: duplicates allowed on both sides. Rarely what we want; exists as an explicit opt-in for intentional Cartesian products per key.
 
 To detect the actual cardinality without enforcing anything:

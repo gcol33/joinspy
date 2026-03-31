@@ -96,46 +96,26 @@ Colling</h4>
 
     
     
-<p>You write a join. It runs without error. You check the row count and
-something is off: rows vanished, or they multiplied. The columns look
-fine. The key values look identical when you print them. You stare at
-<code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> output for ten minutes and learn nothing useful.</p>
-<p>The problem is almost never your join logic. It is the strings.</p>
-<p>R’s <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and dplyr’s <code>*_join()</code> functions
-do exactly what you ask: they compare key values byte-for-byte and link
-rows that are equal. When keys fail to match, the join did not make a
-mistake. The keys are genuinely different. The difficulty is that the
-difference is often invisible: a trailing space, a case mismatch, a
-zero-width Unicode character that has no visual representation.</p>
+<p>A join runs without error but the row count is wrong – fewer rows
+than expected, or more. The columns look fine. The key values look
+identical in the console.</p>
+<p>R’s <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and dplyr’s <code>*_join()</code> compare
+key values byte-for-byte. When keys fail to match, they are genuinely
+different at the byte level: a trailing space, a case mismatch, or a
+zero-width Unicode character that occupies no screen width.</p>
 <p>This vignette walks through five scenarios where joins fail for
-string-level reasons that resist casual inspection. Each one comes from
-a real-world pattern; the data here is synthetic, but the pain is
-authentic. The goal is not to catalogue every possible string problem
-(the <code>common-issues</code> vignette does that), but to show what
-the diagnosis-to-fix workflow looks like in practice.</p>
+string-level reasons that resist casual inspection. The data is
+synthetic; the patterns come from real pipelines.</p>
 <div class="section level2">
 <h2 id="scenario-1-the-excel-export">Scenario 1: The Excel Export<a class="anchor" aria-label="anchor" href="#scenario-1-the-excel-export"></a>
 </h2>
-<p>A small retail analytics team receives monthly sales data from a
-distribution partner. The partner maintains an Excel workbook; every
-month they export a CSV and email it over. The team joins it against
-their internal customer database using a shared <code>customer_id</code>
-column.</p>
-<p>For two quarters, everything works. The pipeline runs, the row counts
-check out, and nobody thinks twice about the join. Then one month, 30%
-of the sales records stop matching. Nobody changed the join code. Nobody
-changed the customer database. The partner swears the IDs are correct
-(and they are, in the sense that every ID in the CSV exists in the
-customer database). Eyeballing the CSV confirms that the values look
-right.</p>
-<p>The analyst opens R, loads both tables, and tries
-<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>. The result has fewer rows than expected. She runs
-<code><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff()</a></code> on the key columns and sees IDs like
-<code>"CUST-1002 "</code> in the partner data that do not appear in the
-internal database. Visually, that looks identical to
-<code>"CUST-1002"</code>. The trailing space is there, but the console
-does not render it distinctly.</p>
-<p>Here is what the data looks like:</p>
+<p>A retail analytics team receives monthly sales data from a
+distribution partner as a CSV exported from Excel. They join it against
+their internal customer database on <code>customer_id</code>. For two
+quarters, everything works. Then one month, 30% of the sales records
+stop matching. Nobody changed the code or the customer database. The
+partner’s IDs are all present in the internal system – or so it
+appears.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">partner_sales</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CUST-1001"</span>, <span class="st">"CUST-1002 "</span>, <span class="st">"CUST-1003"</span>,</span>
@@ -150,17 +130,15 @@ does not render it distinctly.</p>
 <span>  region <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"West"</span>, <span class="st">"East"</span>, <span class="st">"West"</span>, <span class="st">"South"</span>, <span class="st">"East"</span>, <span class="st">"North"</span>, <span class="st">"West"</span><span class="op">)</span>,</span>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Nothing in <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> reveals the issue. Printing the data
-frame will not show it either, because trailing spaces are invisible in
-console output. But <code><a href="../reference/join_spy.html">join_spy()</a></code> catches it immediately:</p>
+<p>Nothing in <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> or <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> reveals the
+issue – trailing spaces are invisible in console output.
+<code><a href="../reference/join_spy.html">join_spy()</a></code> catches it:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">partner_sales</span>, <span class="va">internal_db</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span></code></pre></div>
-<p>Three of the six partner IDs carry whitespace (a leading space,
-trailing spaces, or both). These are distinct character values as far as
-R is concerned; <code>"CUST-1002 "</code> will never match
-<code>"CUST-1002"</code>.</p>
-<p>The fix is one call. <code><a href="../reference/join_repair.html">join_repair()</a></code> trims whitespace from
-both tables at once:</p>
+<p>Three of the six partner IDs carry whitespace.
+<code>"CUST-1002 "</code> is a different string from
+<code>"CUST-1002"</code> as far as R is concerned.
+<code><a href="../reference/join_repair.html">join_repair()</a></code> trims both tables at once:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">partner_sales</span>, <span class="va">internal_db</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">3</span> value(s)</span></span>
@@ -175,29 +153,19 @@ both tables at once:</p>
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">partner_fixed</span>, <span class="va">internal_fixed</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
-<p>All six partner sales matched. The root cause turned out to be a
-formula in the partner’s Excel sheet that concatenated values from two
-columns; one of those columns had variable-width entries padded with
-spaces, and the <code>CONCATENATE</code> formula preserved every byte.
-Nobody noticed because Excel renders <code>"CUST-1002"</code> and
-<code>"CUST-1002 "</code> in exactly the same way. The cell just shows
-the text, and trailing whitespace is invisible in a proportional
-font.</p>
-<p>This is the single most common join failure we have seen. It accounts
-for more broken pipelines than all other string issues combined, and it
-is the easiest to fix once you know it is there.</p>
+<p>The root cause was an Excel <code>CONCATENATE</code> formula that
+preserved trailing spaces from a variable-width source column. Excel
+renders <code>"CUST-1002"</code> and <code>"CUST-1002 "</code>
+identically, so nobody noticed. Trailing whitespace is the single most
+common join failure we see in practice.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-2-two-databases-two-conventions">Scenario 2: Two Databases, Two Conventions<a class="anchor" aria-label="anchor" href="#scenario-2-two-databases-two-conventions"></a>
 </h2>
-<p>Two data sources at a mid-sized SaaS company need to be connected for
-a churn analysis. The CRM stores email addresses in uppercase (a
-decision from a database migration in the late 1990s that nobody
-revisited). The web app’s event log stores them in lowercase, because
-that is what browsers submit. Both systems have been running
-independently for years; the team wants to join CRM profiles to
-clickstream events to see which subscription plans correlate with
-engagement.</p>
+<p>A SaaS company wants to join CRM profiles to clickstream events for a
+churn analysis. The CRM stores email addresses in uppercase (a database
+migration decision from the late 1990s). The web app stores them in
+lowercase. Both systems are internally consistent.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crm_profiles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  email <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ALICE@ACME.COM"</span>, <span class="st">"BOB@ACME.COM"</span>, <span class="st">"CAROL@ACME.COM"</span>,</span>
@@ -212,21 +180,12 @@ engagement.</p>
 <span>  page_views <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">47</span>, <span class="fl">12</span>, <span class="fl">89</span>, <span class="fl">33</span>, <span class="fl">5</span><span class="op">)</span>,</span>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>The team writes a simple inner join and gets zero rows back. Zero.
-Not “fewer than expected”: literally nothing. At first they suspect the
-data did not load correctly, but both tables have the right number of
-rows and the columns are there. The problem is simpler and more
-frustrating: R’s string comparison is case-sensitive, and
-<code>"ALICE@ACME.COM"</code> does not equal
-<code>"alice@acme.com"</code>. Every single key pair fails to match,
-even though the underlying email addresses are obviously the same.</p>
-<p><code><a href="../reference/join_spy.html">join_spy()</a></code> flags the situation before the join even
-happens:</p>
+<p>An inner join returns zero rows. R’s string comparison is
+case-sensitive, so every key pair fails. <code><a href="../reference/join_spy.html">join_spy()</a></code> flags
+the situation before the join:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">crm_profiles</span>, <span class="va">click_events</span>, by <span class="op">=</span> <span class="st">"email"</span><span class="op">)</span></span></code></pre></div>
-<p>The case mismatch issue appears in the report.
-<code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> can generate the specific code to fix
-it:</p>
+<p><code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> generates the fix:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -256,38 +215,20 @@ in the CRM):</p>
 <span><span class="co">#&gt; 2   bob@acme.com    starter         12</span></span>
 <span><span class="co">#&gt; 3 carol@acme.com        pro         89</span></span>
 <span><span class="co">#&gt; 4  dave@acme.com enterprise         33</span></span></code></pre></div>
-<p>The interesting thing about this scenario is that neither data source
-is “wrong.” Both are internally consistent; the problem exists only at
-the boundary between them. This is the most common shape of join
-failures in organizational data work: each system is correct in
-isolation, maintained by a different team, documented in its own way.
-The incompatibility only surfaces when someone tries to connect them,
-and the person doing the connecting is usually not the person who chose
-the casing convention in either system.</p>
-<p>Note that email addresses are case-insensitive by RFC 5321 (the local
-part before the @ technically can be case-sensitive, but almost no mail
-server enforces this in practice). Lowercasing is the right
-normalization here. For other types of identifiers (product codes,
-country abbreviations, ticker symbols) you may want <code>"upper"</code>
-instead. The point is to pick one convention and apply it to both sides
-before joining.</p>
+<p>Email addresses are case-insensitive by RFC 5321, so lowercasing is
+the right normalization here. For other identifier types (product codes,
+country abbreviations), <code>"upper"</code> may be more
+appropriate.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-3-the-pdf-copy-paste">Scenario 3: The PDF Copy-Paste<a class="anchor" aria-label="anchor" href="#scenario-3-the-pdf-copy-paste"></a>
 </h2>
-<p>A public health researcher is compiling data from multiple sources
-for a systematic review. Most of the data comes from structured
-databases, but a handful of studies published their supplementary tables
-only as PDF. The researcher needs prevalence estimates from those PDFs,
-so she selects the table in the PDF viewer, copies it, pastes it into a
-spreadsheet, cleans up the columns, exports to CSV, and reads it into
-R.</p>
-<p>The data looks perfect. Every country name is spelled correctly when
-she prints the data frame. The columns have the right types. But when
-she joins against a reference table of population data, half the
-countries fail to match. She checks for typos manually; there are none.
-She runs <code><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique()</a></code> on both country columns and compares them
-by eye; they look identical.</p>
+<p>A public health researcher compiles data from multiple sources for a
+systematic review. A few studies published supplementary tables only as
+PDF, so she copies the table from the PDF viewer, pastes into a
+spreadsheet, cleans up the columns, and reads the CSV into R. The data
+looks perfect – every country name is spelled correctly. But half the
+countries fail to match a reference population table.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Simulating PDF copy-paste artifacts:</span></span>
 <span><span class="co"># \u00A0 is non-breaking space, \u200B is zero-width space</span></span>
@@ -304,72 +245,45 @@ by eye; they look identical.</p>
 <span>  population_m <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">214</span>, <span class="fl">1408</span>, <span class="fl">84</span>, <span class="fl">125</span>, <span class="fl">38</span>, <span class="fl">68</span>, <span class="fl">59</span><span class="op">)</span>,</span>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Watch what happens when we print the PDF data:</p>
+<p>Printing the PDF data shows nothing wrong:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pdf_data</span><span class="op">$</span><span class="va">country</span></span>
 <span><span class="co">#&gt; [1] "Brazil"  "India​"   "Germany" "Japan "  "Canada"  "France​"</span></span></code></pre></div>
-<p>Those country names look perfectly clean. The zero-width space after
-“India” and “France” is literally invisible; it occupies zero pixels of
-width. The non-breaking space after “Japan” renders identically to a
-regular space (which <code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code> would catch), but it is
-Unicode character U+00A0, not U+0020. A plain <code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code> call
-will not remove it in all R versions.</p>
-<p>The merge confirms the damage:</p>
+<p>The zero-width space after “India” and “France” occupies zero pixels.
+The non-breaking space after “Japan” renders like a regular space but is
+U+00A0, not U+0020 – <code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code> will not always remove it.
+The merge reflects this:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 3</span></span></code></pre></div>
-<p>Only three of six countries match. The researcher might spend an hour
-checking for typos that do not exist, because the characters causing the
-failure are invisible to the human eye.</p>
-<p><code><a href="../reference/join_spy.html">join_spy()</a></code> detects encoding issues that string
-inspection cannot:</p>
+<p>Three of six countries match. <code><a href="../reference/join_spy.html">join_spy()</a></code> detects the
+invisible characters:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span></code></pre></div>
-<p>The report flags invisible characters in the left table. Repair is
-straightforward:</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">3</span> value(s)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
-<p>Six matches, as expected. The zero-width spaces and non-breaking
-spaces are gone.</p>
-<p>This class of problem is hard to catch. Every standard debugging tool
-(<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>,
-<code><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique()</a></code>, even visual comparison in a spreadsheet) will
-show you data that looks correct. You can copy the value from the
-console, paste it into a string comparison, and it will fail, and you
-will not understand why. The characters are there in the byte
-representation; they simply have no visible glyph. PDF copy-paste is the
-most common source, but web scraping, OCR output, and data from legacy
-mainframe systems can produce the same artifacts.</p>
-<p>One useful debugging trick outside of joinspy: if you suspect
-invisible characters, run <code><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar()</a></code> on the values.
-<code>"India\u200B"</code> has 6 characters, not 5. But that requires
-you to already suspect the problem exists. <code><a href="../reference/join_spy.html">join_spy()</a></code> flags
-it proactively, before you have spent an hour staring at
-identical-looking strings.</p>
+<p>Six matches. PDF copy-paste is the most common source of these
+artifacts, but web scraping, OCR output, and legacy mainframe exports
+can produce them too. One useful debugging trick outside of joinspy:
+<code>nchar("India\u200B")</code> returns 6, not 5. But that requires
+already suspecting the problem.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-4-the-slowly-growing-mismatch">Scenario 4: The Slowly Growing Mismatch<a class="anchor" aria-label="anchor" href="#scenario-4-the-slowly-growing-mismatch"></a>
 </h2>
-<p>Consider a monthly ETL pipeline that has been stable for over a year
-at an e-commerce company. Transaction records from the point-of-sale
-system are joined to a product catalogue to attach product names,
-categories, and profit margins. Finance uses the output for monthly
-reporting. The pipeline ran cleanly for months. Then the match rate
-started drifting downward: 99% in January, 97% in February, 94% in
-March. The pipeline did not fail; it just returned slightly fewer rows
-each month. Nobody noticed until April, when finance flagged a
-discrepancy in the margin totals.</p>
-<p>The code had not changed. The product catalogue had not changed. What
-changed was a person. A new data entry clerk joined the warehouse team
-in December. The existing convention for product codes was strict:
-<code>"WDG-100"</code>, <code>"WDG-101"</code>, uppercase prefix, dash,
-three-digit numeric suffix. The new clerk sometimes omitted the dash,
-sometimes typed in lowercase, sometimes both. The codes were close
-enough that the warehouse system accepted them (it did fuzzy matching
-internally), but the join in the ETL pipeline did not.</p>
+<p>An e-commerce pipeline joins transaction records to a product
+catalogue. The pipeline ran cleanly for months, then match rates started
+drifting: 99% in January, 97% in February, 94% in March. Nobody noticed
+until finance flagged a margin discrepancy in April.</p>
+<p>The code had not changed. A new data entry clerk had joined the
+warehouse team in December. The canonical product code format was
+<code>"WDG-100"</code> – uppercase prefix, dash, three-digit suffix. The
+new clerk sometimes omitted the dash, sometimes typed lowercase. The
+warehouse system did fuzzy matching internally, so it accepted the
+codes. The ETL join did not.</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Product catalogue (canonical format)</span></span>
 <span><span class="va">catalogue</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -389,18 +303,14 @@ internally), but the join in the ETL pipeline did not.</p>
 <span>  quantity <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">3</span>, <span class="fl">7</span>, <span class="fl">2</span>, <span class="fl">4</span>, <span class="fl">6</span>, <span class="fl">1</span>, <span class="fl">8</span><span class="op">)</span>,</span>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Some of these will match; some will not. The damage is partial, which
-makes it harder to notice than a complete failure.
-<code><a href="../reference/join_spy.html">join_spy()</a></code> shows the picture:</p>
+<p>Some codes match and some do not, which makes partial failures harder
+to spot than complete ones.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">transactions</span>, <span class="va">catalogue</span>, by <span class="op">=</span> <span class="st">"product_code"</span><span class="op">)</span></span></code></pre></div>
-<p>The report flags both case mismatches and unmatched keys. But here is
-where this scenario differs from the previous ones:
-<code><a href="../reference/join_repair.html">join_repair()</a></code> can fix the case issue, but it cannot fix the
-missing dashes. Whitespace trimming and case standardization are
-mechanical transformations; inserting a dash into <code>"WDG102"</code>
-to make it match <code>"WDG-102"</code> requires knowledge of the
-formatting rule, which the tool does not have.</p>
+<p>Here is where this scenario differs from the previous ones.
+<code><a href="../reference/join_repair.html">join_repair()</a></code> can fix the case issue, but it cannot insert
+the missing dashes – that requires domain knowledge about the code
+format.</p>
 <p>We can do a dry run to see what <code><a href="../reference/join_repair.html">join_repair()</a></code> would
 fix:</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
@@ -420,44 +330,31 @@ fix:</p>
 <span>                        by <span class="op">=</span> <span class="st">"product_code"</span>,</span>
 <span>                        standardize_case <span class="op">=</span> <span class="st">"upper"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span></code></pre></div>
-<p>The case issues are resolved, but the dash-versus-no-dash mismatches
-remain. Those require a manual transformation:</p>
+<p>The case issues are resolved, but the missing dashes remain. A manual
+transformation handles those:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Manual fix: insert dash if missing in product codes matching the pattern</span></span>
 <span><span class="va">fix_codes</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">codes</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"^([A-Z]{3})(\\d)"</span>, <span class="st">"\\1-\\2"</span>, <span class="va">codes</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span><span class="op">$</span><span class="va">product_code</span> <span class="op">&lt;-</span> <span class="fu">fix_codes</span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span><span class="op">$</span><span class="va">product_code</span><span class="op">)</span></span></code></pre></div>
-<p>Now we can verify:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"product_code"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 8</span></span></code></pre></div>
-<p>All eight transactions match. This scenario is worth sitting with for
-a moment, because it illustrates a boundary in what automated repair can
-do. <code><a href="../reference/join_repair.html">join_repair()</a></code> handles mechanical transformations:
-trimming whitespace, normalizing case, stripping invisible characters.
-These are context-free operations that are always safe to apply. But
-inserting a dash into <code>"WDG102"</code> to produce
-<code>"WDG-102"</code> requires knowing that the canonical format uses a
-dash after three letters. That is domain knowledge.
-<code><a href="../reference/join_spy.html">join_spy()</a></code> will show you that keys are unmatched and flag
-near-matches, but the fix has to come from someone who understands the
-data.</p>
-<p>In practice, the right response to this kind of drift is not just a
-regex in the pipeline; it is a conversation with the warehouse team
-about enforcing the code format at the point of entry. The pipeline fix
-is a bandage; the process fix is the cure.</p>
+<p>All eight transactions match. <code><a href="../reference/join_repair.html">join_repair()</a></code> handles
+context-free transformations (trimming, case normalization, stripping
+invisible characters). Inserting a dash into <code>"WDG102"</code>
+requires knowing the canonical format – that fix has to come from
+someone who understands the data.</p>
 </div>
 <div class="section level2">
-<h2 id="scenario-5-the-compound-key-trap">Scenario 5: The Compound Key Trap<a class="anchor" aria-label="anchor" href="#scenario-5-the-compound-key-trap"></a>
+<h2 id="scenario-5-compound-keys">Scenario 5: Compound Keys<a class="anchor" aria-label="anchor" href="#scenario-5-compound-keys"></a>
 </h2>
-<p>This one is subtle. Two government datasets need to be linked for a
-policy briefing: regional economic indicators and regional population
-estimates. Both tables are keyed on region and year, a compound key with
-two columns. The year column is numeric, so it matches without trouble.
-The region column is character, and it has a problem that affects only
-some of the records.</p>
+<p>Two government datasets need to be linked: regional economic
+indicators and regional population estimates, keyed on region and year.
+The year column is numeric and matches without trouble. The region
+column has a whitespace problem that affects only some records.</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">economics</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  region <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North America"</span>, <span class="st">"Europe"</span>, <span class="st">"Asia Pacific "</span>,</span>
@@ -474,81 +371,42 @@ some of the records.</p>
 <span>  pop_millions <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">580</span>, <span class="fl">450</span>, <span class="fl">4300</span>, <span class="fl">585</span>, <span class="fl">448</span>, <span class="fl">4350</span><span class="op">)</span>,</span>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>In a compound key join, both columns must match for a row to link.
-The year column is fine everywhere. But <code>"Asia Pacific "</code>
-(with a trailing space) in the economics table will not match
-<code>"Asia Pacific"</code> in the population table. The result: North
-America and Europe link correctly; Asia Pacific silently vanishes.</p>
+<p>In a compound key join, both columns must match. The year column is
+fine everywhere, but <code>"Asia Pacific "</code> with a trailing space
+will not match <code>"Asia Pacific"</code>.</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">merged</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
-<p>Four rows instead of six. Two-thirds of the data linked successfully,
-which is just enough to look plausible if you are not paying close
-attention. The analyst producing the policy briefing might not notice
-that Asia Pacific is missing entirely, especially if the briefing
-template just shows a table of whatever regions came through, without
-verifying completeness. Someone running this pipeline on autopilot might
-not catch the drop for weeks, and when they do notice, they might blame
-the data provider rather than the string encoding.</p>
+<p>Four rows instead of six. North America and Europe match; Asia
+Pacific does not, because of the trailing space.</p>
 <p><code><a href="../reference/join_spy.html">join_spy()</a></code> pinpoints which column in the compound key
 has the problem:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>The whitespace issue is flagged specifically in the
-<code>region</code> column. We repair just that column and leave
-<code>year</code> untouched (it is numeric; there is nothing to
-trim):</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
-<p>Six rows. All regions, both years. The fix was trivial once the
-problem was identified; finding the problem was the hard part.</p>
-<p>Compound keys are more fragile than single keys precisely because the
-failure mode is partial. A single-column key with whitespace issues will
-drop rows in a way that is at least dramatic enough to investigate. A
-compound key with one clean column and one dirty column will match on
-some rows and fail on others, producing a result that looks reasonable
-but is quietly incomplete. The more columns in the key, the more places
-a single invisible character can hide.</p>
+<p>Six rows. With compound keys, a string issue in any single column is
+enough to break the match. The more columns in the key, the more places
+a byte-level discrepancy can occur.</p>
 </div>
 <div class="section level2">
 <h2 id="the-pattern">The Pattern<a class="anchor" aria-label="anchor" href="#the-pattern"></a>
 </h2>
-<p>Every scenario in this vignette shares three properties.</p>
-<p>First, the data looks correct to standard inspection tools.
-<code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> shows character columns of the right type.
-<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> reports the right number of unique values (give
-or take). <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> renders the values identically. Nothing
-in the usual diagnostic workflow reveals the problem. The tools are not
-broken; they were simply not designed for this. <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> tells
-you the type and length of a vector. It does not tell you whether byte 7
-of the third element is a regular space or a non-breaking space.</p>
-<p>Second, the failure is silent. R does not warn you when a merge drops
-rows because of invisible whitespace; it just returns fewer rows. If you
-are not checking row counts before and after every join (and many
-pipelines do not), the error propagates downstream without any signal
-that something went wrong. A left join will still return all rows from
-the left table, but the columns from the right table will be filled with
-<code>NA</code> where the match failed, and those NAs might look like
-legitimate missing data.</p>
-<p>Third, the fix is mechanical once you know the cause. Trimming
-whitespace, lowercasing strings, stripping invisible Unicode: these are
-one-line operations. The repair is trivial; the diagnosis is where all
-the time goes. An analyst who knows that the problem is trailing
-whitespace can fix it in thirty seconds. An analyst who does not know
-that will spend hours comparing values that look identical, questioning
-the join logic, rebuilding the pipeline from scratch, and still not
-finding the issue.</p>
-<p><code><a href="../reference/join_spy.html">join_spy()</a></code> was built to close that gap between the
-thirty-second fix and the hours of confusion that precede it. Run it
-before your joins, especially when working with data from external
-sources, manual entry, PDF extraction, or cross-system integrations. The
-function checks for the problems that <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> and
-<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> were never designed to catch.</p>
+<p>These five scenarios share three properties. The data looks correct
+to standard inspection tools – <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code>,
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> all render the values
+identically. R returns fewer (or more) rows without a warning, because
+the key values genuinely differ at the byte level. And the fix is
+mechanical once the cause is known – trimming, lowercasing, or stripping
+invisible Unicode are all one-line operations.</p>
+<p><code><a href="../reference/join_spy.html">join_spy()</a></code> surfaces the cause directly, which is
+especially useful with data from external sources, manual entry, PDF
+extraction, or cross-system integrations.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

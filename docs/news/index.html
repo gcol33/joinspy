@@ -61,6 +61,27 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.8.0" id="joinspy-080">joinspy 0.8.0<a class="anchor" aria-label="anchor" href="#joinspy-080"></a></h2><p class="text-muted">CRAN release: 2026-03-31</p>
+<div class="section level3">
+<h3 id="multi-backend-join-support-0-8-0">Multi-Backend Join Support<a class="anchor" aria-label="anchor" href="#multi-backend-join-support-0-8-0"></a></h3>
+<ul><li>Join wrappers (<code><a href="../reference/left_join_spy.html">left_join_spy()</a></code>, <code><a href="../reference/join_strict.html">join_strict()</a></code>, etc.) now auto-detect input class and dispatch to the native join engine: tibble inputs use dplyr, data.table inputs use data.table, plain data.frames use base R <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>
+</li>
+<li>New <code>backend</code> parameter for explicit override (<code>"base"</code>, <code>"dplyr"</code>, <code>"data.table"</code>)</li>
+<li>Class preserved through the full diagnose-repair-join cycle</li>
+<li>Graceful fallback to base R with a warning if the detected backend package is not installed</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-overhaul-0-8-0">Documentation Overhaul<a class="anchor" aria-label="anchor" href="#documentation-overhaul-0-8-0"></a></h3>
+<ul><li>README reframed around string-level key diagnostics (whitespace, case, encoding, typos) as the primary value proposition</li>
+<li>Three new vignettes: “Why Your Keys Don’t Match” (real-world scenarios), “Joins in Production” (pipelines, logging, guards), “Working with Backends” (tibble/data.table/base R)</li>
+<li>Existing vignettes (quickstart, common-issues) expanded from 850 to 4,500+ prose words</li>
+</ul></div>
+<div class="section level3">
+<h3 id="testing-0-8-0">Testing<a class="anchor" aria-label="anchor" href="#testing-0-8-0"></a></h3>
+<ul><li>46 new backend tests covering auto-detection, explicit override, named <code>by</code> vectors, class preservation, and all three backends</li>
+</ul><hr></div>
+</div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.7.2" id="joinspy-072">joinspy 0.7.2<a class="anchor" aria-label="anchor" href="#joinspy-072"></a></h2>
 <div class="section level3">
 <h3 id="testing--quality-0-7-2">Testing &amp; Quality<a class="anchor" aria-label="anchor" href="#testing--quality-0-7-2"></a></h3>

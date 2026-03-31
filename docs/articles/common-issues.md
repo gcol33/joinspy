@@ -1,22 +1,17 @@
 # Common Join Problems
 
-Most join bugs are not about cardinality. They are about strings. A
-trailing space, a flipped case, a zero-width Unicode character: any of
-these will cause two keys that *look* identical to fail matching
-silently. The result is missing rows, and you blame the data when the
-real culprit is invisible.
+Trailing spaces, flipped case, and zero-width Unicode characters make
+keys that look identical on screen compare as different during a join.
 
-This vignette walks through the problems joinspy was built to catch,
-ordered by how often they actually cause grief. String-level issues come
-first because they account for the majority of “why did my join drop
-rows?” questions. Structural issues (duplicates, NAs, type mismatches,
-Cartesian explosions) follow.
+This vignette covers the issues joinspy detects, ordered roughly by
+frequency. String-level issues come first, then structural ones
+(duplicates, NAs, type mismatches, Cartesian explosions).
 
 ## Trailing and leading whitespace
 
-The classic. Someone exports a CSV from Excel, and now half your keys
-carry a trailing space. Everything looks fine when you print the data
-frame. Nothing matches when you join.
+The classic. Someone exports a CSV from Excel, and now half the keys
+carry a trailing space. Everything looks fine when we print the data
+frame. Nothing matches when we join.
 
 ``` r
 
@@ -74,18 +69,10 @@ key_check(sales_clean, inventory, by = "product")
 #> ✔ Key check passed: no issues detected
 ```
 
-If you want to see the repair without applying it, pass
-`dry_run = TRUE`.
+Passing `dry_run = TRUE` previews the repair without applying it.
 
-Why does this happen so often? Excel pads cells when you widen columns
-manually, and copy-pasting from web tables brings in non-breaking spaces
-that look like regular ones. ETL pipelines that concatenate fixed-width
-fields frequently leave padding intact, and the engineer who wrote the
-pipeline assumed downstream consumers would trim—an assumption that
-rarely survives contact with reality.
-
-The problem compounds with composite keys. When the join uses two or
-more columns, whitespace in *any* of them is enough to break the match:
+The problem compounds with composite keys – whitespace in *any* column
+is enough to break the match:
 
 ``` r
 
@@ -142,7 +129,7 @@ join_spy(shipments, stock, by = c("warehouse", "product"))
 ```
 
 Both `warehouse` and `product` carry trailing spaces in `shipments`, so
-all three rows fail to match despite looking correct on screen. A single
+all three rows fail to match. A single
 [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
 call cleans every key column at once:
 
@@ -156,10 +143,8 @@ key_check(shipments_clean, stock, by = c("warehouse", "product"))
 
 ## Case mismatches
 
-Databases are often case-insensitive. R is not. When you pull tables
-from two different systems, one might store `"ABC"` and the other
-`"abc"`. They refer to the same entity, but R treats them as different
-keys.
+Databases are often case-insensitive; R is not. When we pull tables from
+two different systems, one might store `"ABC"` and the other `"abc"`.
 
 ``` r
 
@@ -176,9 +161,7 @@ metadata <- data.frame(
 )
 ```
 
-None of these keys match as-is.
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-picks this up:
+None of these keys match as-is:
 
 ``` r
 
@@ -212,7 +195,7 @@ join_spy(sensors, metadata, by = "station")
 #> full_join: 6
 ```
 
-Repair both sides to a common case:
+We can repair both sides to a common case:
 
 ``` r
 
@@ -222,27 +205,16 @@ key_check(repaired$x, repaired$y, by = "station")
 #> ✔ Key check passed: no issues detected
 ```
 
-You choose the target case. `"lower"`, `"upper"`, or `"title"` all work.
-In practice, `"lower"` is the safest default. Lowercase is unambiguous
-(no locale-dependent rules for title case), and most database systems
-normalize to lowercase internally. Upper case is fine too, but title
-case introduces edge cases with acronyms and prepositions that vary by
-language.
-
-One subtlety: if your key column is a `factor`, case standardization
-changes the level labels but not the underlying integer codes. This can
-produce factors whose levels look identical after lowering but
-originally pointed to different groups. Convert to character first
-([`as.character()`](https://rdrr.io/r/base/character.html)) before
-standardizing case on factor columns; otherwise you risk silently
-merging distinct factor levels.
+`"lower"`, `"upper"`, and `"title"` all work. One thing to watch for: if
+the key column is a `factor`, case standardization changes the level
+labels but not the underlying integer codes. Converting to character
+first avoids silently merging distinct factor levels.
 
 ## Encoding and invisible characters
 
-This one is genuinely nasty. A key contains a non-breaking space
-(U+00A0) instead of a regular space, or a zero-width joiner crept in
-during a copy-paste from a PDF. The strings print identically. They do
-not match.
+A key contains a non-breaking space (U+00A0) instead of a regular space,
+or a zero-width joiner crept in during a copy-paste from a PDF. The
+strings print identically but do not match.
 
 ``` r
 
@@ -302,38 +274,24 @@ key_check(left_fixed, right, by = "city")
 #> ✔ Key check passed: no issues detected
 ```
 
-Where do these invisible characters come from? The most common sources
-are: PDF extraction (which inserts soft hyphens, zero-width spaces, and
-ligature code points that have no visible glyph); web scraping, where
-HTML entities and Unicode normalization forms vary across pages; and
-cross-platform file transfers, where Windows line endings (`\r\n`) or
-UTF-8 BOM markers (the byte sequence `EF BB BF` at the start of a file)
-sneak into key columns when files are read as raw text. Spreadsheets
-saved from Google Sheets vs. Excel vs. LibreOffice produce subtly
-different Unicode normalization, so the same accented character may be
-stored as a single code point in one file and as a base character plus a
-combining accent in another.
-
+Common sources include PDF extraction, web scraping, and cross-platform
+file transfers.
 [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
-with `remove_invisible = TRUE` (the default) handles the most common
-offenders: non-breaking spaces, zero-width joiners and non-joiners, BOM
-markers, and soft hyphens. It does not attempt full Unicode
-normalization (NFC vs. NFD), nor does it strip all control characters;
-some of those are legitimate data. If
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-still flags encoding issues after repair, you may need
-[`stringi::stri_trans_nfc()`](https://rdrr.io/pkg/stringi/man/stri_trans_nf.html)
-for normalization or a manual inspection of the raw byte sequences with
-[`chartr()`](https://rdrr.io/r/base/chartr.html).
+handles the most common offenders: non-breaking spaces, zero-width
+joiners, BOM markers, and soft hyphens. It does not attempt full Unicode
+normalization (NFC vs. NFD); for that we would reach for
+[`stringi::stri_trans_nfc()`](https://rdrr.io/pkg/stringi/man/stri_trans_nf.html).
 
-When you suspect encoding trouble but cannot see it,
+If
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+still flags encoding issues after repair,
 [`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
-on a report will print the exact R code you need.
+on a report will print the exact R code needed.
 
 ## Empty strings masquerading as data
 
 Empty strings (`""`) are valid character values in R. They will match
-other empty strings in a join, which is almost never what you want: two
+other empty strings in a join, which is almost never what we want: two
 rows with missing identifiers get joined as though they refer to the
 same entity.
 
@@ -382,8 +340,8 @@ join_spy(patients, visits, by = "mrn")
 #> full_join: NA
 ```
 
-Convert empties to `NA` before joining. NAs never match in R, which is
-the correct behavior for missing identifiers:
+Converting empties to `NA` before joining fixes this, since NAs never
+match in R:
 
 ``` r
 
@@ -393,21 +351,16 @@ patients_fixed$mrn
 #> [1] "P001" NA     "P003"
 ```
 
-The join will now drop those rows instead of incorrectly linking them,
-but note that `data.table` treats `""` and `NA_character_` as distinct
-values in keyed joins; an empty string in one table will not match an
-`NA` in the other, even though both represent “missing.” If you use a
-data.table backend, convert empty strings to `NA` on both sides to get
-consistent behavior.
+Note that `data.table` treats `""` and `NA_character_` as distinct in
+keyed joins, so when using a data.table backend we need to convert empty
+strings to `NA` on both sides.
 
 ## Near-matches and typos
 
-Sometimes keys are close but not identical. `"Wiget"` vs `"Widget"`, or
-`"customer_001"` vs `"cust_001"`. These are not whitespace or case
-problems; they are genuine mismatches that
+Sometimes keys are close but not identical. These are not whitespace or
+case problems – they are genuine mismatches that
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-can flag when it finds keys in one table with no counterpart in the
-other.
+flags when it finds keys in one table with no counterpart in the other.
 
 ``` r
 
@@ -426,16 +379,11 @@ catalog <- data.frame(
 report <- join_spy(orders, catalog, by = "sku")
 ```
 
-The mismatch between `"GZM-300"` and `"GZM-301"` shows up in the
-unmatched keys. Internally,
+Internally,
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-computes edit distances (Levenshtein distance) between unmatched keys on
-each side. When two keys differ by only one or two characters, the
-report flags them as near-matches, which helps you distinguish typos
-from genuinely different entities.
-
-Here is a clearer example where near-match detection fires on multiple
-keys:
+computes Levenshtein distances between unmatched keys. When two keys
+differ by only one or two characters, the report flags them as
+near-matches. Here is a clearer example with multiple near-matches:
 
 ``` r
 
@@ -456,20 +404,16 @@ report <- join_spy(employees, payroll, by = "name")
 
 `"Johnson"` vs. `"Jonhson"` (transposition), `"Smithe"` vs. `"Smith"`
 (extra character), and `"O'Brian"` vs. `"O'Brien"` (vowel swap) are all
-within edit distance 2 and get flagged. `"Williams"` matches exactly and
-passes through.
-
-For typos, there is no automated fix because joinspy cannot know which
-side is correct. But the near-match list gives you a concrete starting
-point: build a lookup table mapping the wrong spellings to the right
-ones, or go back to the source system and fix the data there.
+within edit distance 2. `"Williams"` matches exactly. There is no
+automated fix here since joinspy cannot know which side is correct, but
+the near-match list gives a concrete starting point for building a
+lookup table.
 
 ## Duplicate keys
 
-Now we cross into structural territory. Duplicate keys cause row
-multiplication. A left join on a key that appears twice in the right
-table will double the corresponding rows from the left table. Three
-copies triple them. Most people do not expect this.
+Duplicate keys cause row multiplication. A left join on a key that
+appears twice in the right table doubles the corresponding rows from the
+left.
 
 ``` r
 
@@ -514,7 +458,7 @@ join_spy(orders, addresses, by = "customer_id")
 ```
 
 [`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)
-shows you exactly which rows are responsible:
+shows which rows are responsible:
 
 ``` r
 
@@ -524,12 +468,12 @@ key_duplicates(addresses, by = "customer_id")
 #> 3           2      SF             2
 ```
 
-The fix depends on your intent. If each customer should have one
-address, deduplicate first. If you genuinely need all combinations, the
-multiplication is correct and you just need to know it will happen.
+If each customer should have one address, we deduplicate first. If we
+genuinely need all combinations, the multiplication is correct – we just
+need to know it will happen.
 
-When *both* sides have duplicates the situation is worse. Each key group
-produces a Cartesian product:
+When *both* sides have duplicates, each key group produces a Cartesian
+product:
 
 ``` r
 
@@ -576,8 +520,7 @@ join_spy(orders_dup, prices_dup, by = "product")
 Product `"A"` has 2 rows on the left and 3 on the right, so a join
 produces 2 x 3 = 6 rows for that key alone.
 [`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
-quantifies the total expansion across all key groups before you run the
-join:
+quantifies the total expansion before we run the join:
 
 ``` r
 
@@ -633,17 +576,8 @@ join_spy(orders, customers, by = "customer_id")
 #> full_join: 6
 ```
 
-NA keys are common in datasets where some records were entered without a
-complete identifier (think hospital admissions with unknown patient IDs,
-or sensor readings before the device was registered). The deeper problem
-is that NA keys don’t just fail to match the other table; they also fail
-to match *each other*. Two rows with `NA` keys in the left table will
-not be grouped together, which means aggregation after a join treats
-each NA row as its own group. This is rarely what you want.
-
-There are two reasonable responses. Remove rows with NA keys before
-joining, or replace NAs with a sentinel value if you actually want them
-to match:
+We can either remove rows with NA keys before joining, or replace NAs
+with a sentinel value if we actually want them to match:
 
 ``` r
 
@@ -657,10 +591,9 @@ key_check(orders_clean, customers, by = "customer_id")
 ## Type mismatches
 
 One table stores IDs as integers, the other as character strings.
-[`merge()`](https://rdrr.io/r/base/merge.html) will coerce silently;
+[`merge()`](https://rdrr.io/r/base/merge.html) coerces silently;
 [`dplyr::left_join()`](https://dplyr.tidyverse.org/reference/mutate-joins.html)
-will refuse. Either way, you want to know about it before the join, not
-after.
+refuses. Either way, we want to know about it before the join.
 
 ``` r
 
@@ -705,14 +638,10 @@ join_spy(invoices, products, by = "product_id")
 ```
 
 A subtler variant occurs with `Date` vs. character, or `POSIXct`
-vs. `Date`: the join either fails outright or coerces through numeric
-intermediaries, producing nonsense matches.
+vs. `Date`, where the join either fails or coerces through numeric
+intermediaries.
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-flags the type mismatch regardless of which types are involved, not just
-integer-vs-character.
-
-The fix is always explicit conversion. Pick the type that makes more
-sense for your downstream analysis and convert the other table:
+flags the type mismatch regardless of the types involved.
 
 ``` r
 
@@ -723,15 +652,9 @@ key_check(invoices, products, by = "product_id")
 
 ## Many-to-many explosions
 
-When both tables have duplicate keys, you get a Cartesian product within
-each key group. Two duplicates on the left times three on the right
-gives six rows for that key alone. With real data this can turn a
-10,000-row join into a million-row table. To put concrete numbers on it:
-suppose the left table has 50,000 rows and the right table has 30,000
-rows, with an average of 4 duplicates per key on each side. The
-resulting join can exceed 100 million rows, consuming gigabytes of
-memory and taking minutes to complete on hardware that handles the
-original tables in milliseconds.
+When both tables have duplicate keys, we get a Cartesian product within
+each key group. With real data this can turn a 10,000-row join into a
+million-row table.
 
 ``` r
 
@@ -752,7 +675,7 @@ check_cartesian(items, payments, by = "order_id")
 ```
 
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-tells you the relationship type:
+tells us the relationship type:
 
 ``` r
 
@@ -762,18 +685,9 @@ detect_cardinality(items, payments, by = "order_id")
 #> Right duplicates: 2 key(s)
 ```
 
-In production pipelines, m:m explosions are dangerous beyond the obvious
-memory cost. A 50,000-row table joined against a 30,000-row table with
-moderate duplication can silently produce tens of millions of rows.
-Downstream aggregations (sums, means, counts) then operate on the
-inflated table and return wrong numbers; the results look plausible, so
-nobody catches the error until a business decision has already been
-made. Even if memory is not a constraint, the arithmetic is wrong
-because observations are counted multiple times.
-
-If you expected a one-to-many relationship,
+If we expected a one-to-many relationship,
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-will stop you before the explosion happens:
+will stop us before the explosion happens:
 
 ``` r
 
@@ -785,11 +699,8 @@ join_strict(items, payments, by = "order_id", type = "left", expect = "1:m")
 
 ## No matches at all
 
-Your inner join returns zero rows. This is the most alarming failure
-mode because the result is an empty data frame, which propagates
-silently through downstream code until something visibly breaks (an
-empty plot, a division by zero in a summary statistic). Before you
-question your sanity, check whether the keys even overlap:
+An inner join returns zero rows, and downstream code may not check for
+an empty data frame.
 
 ``` r
 
@@ -830,12 +741,9 @@ join_spy(system_a, system_b, by = "user_id")
 #> full_join: 6
 ```
 
-Zero overlap. The keys use completely different formats. No amount of
-trimming or case-folding will help here; the problem is semantic, not
-syntactic. This happens frequently when two systems were designed
-independently, or when one system migrated its ID scheme and the other
-did not. You need a mapping table or a transformation that extracts the
-numeric part from `system_a`:
+Zero overlap – the keys use completely different formats, and no amount
+of trimming or case-folding will help. We need a mapping table or a
+transformation that extracts the numeric part:
 
 ``` r
 
@@ -846,30 +754,22 @@ key_check(system_a, system_b, by = c("user_num" = "user_id"))
 
 ## Troubleshooting workflow
 
-When a join goes wrong, work through these steps in order. Most problems
-resolve in the first three.
-
-**Step 1: Run
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md).**
-This is always the starting point. It checks string quality, key
-overlap, cardinality, and predicted row counts in a single call.
+When a join goes wrong, we typically start with
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md).
+It checks string quality, key overlap, cardinality, and predicted row
+counts in one call:
 
 ``` r
 
 report <- join_spy(x, y, by = "key_col")
 ```
 
-For large datasets (hundreds of thousands of rows or more), the full
-diagnostic scan can be slow. Pass `sample = 1000` to run
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-on a random subset first; this catches the most common problems in
-seconds rather than minutes. If the sampled report looks clean, run
-again without sampling to confirm.
+For large datasets, passing `sample = 1000` runs the check on a random
+subset first.
 
-**Step 2: Fix string issues.** If the report flags whitespace, case,
-encoding, or empty strings, run
-[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md).
-This handles the most common class of silent failures.
+If the report flags whitespace, case, encoding, or empty strings,
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+handles them:
 
 ``` r
 
@@ -878,20 +778,17 @@ x_clean <- join_repair(x, by = "key_col")
 repaired <- join_repair(x, y, by = "key_col", standardize_case = "lower")
 ```
 
-**Step 3: Check for duplicates.** If the predicted row count is higher
-than you expected, inspect duplicates with
-[`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)
-and decide whether to aggregate or deduplicate.
+If the predicted row count is higher than expected, we inspect
+duplicates and decide whether to aggregate or deduplicate:
 
 ``` r
 
 key_duplicates(y, by = "key_col")
 ```
 
-**Step 4: Enforce cardinality.** Once keys are clean, use
+Once keys are clean,
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-to guarantee the relationship you expect. This catches edge cases that
-slip through manual inspection.
+enforces the cardinality we expect:
 
 ``` r
 
@@ -899,10 +796,9 @@ result <- join_strict(x_clean, y_clean, by = "key_col",
                       type = "left", expect = "1:1")
 ```
 
-**Step 5: Explain the result.** If the joined output still looks wrong,
-run
+If the joined output still looks wrong,
 [`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)
-to get a breakdown of what happened:
+gives a breakdown of what happened:
 
 ``` r
 
@@ -910,13 +806,10 @@ result <- left_join_spy(x_clean, y_clean, by = "key_col")
 join_explain(result, x_clean, y_clean, by = "key_col")
 ```
 
-**Step 6: Log for audit trails.** In production workflows, you want a
-record of what
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-found and what repairs were applied. Use
+In production pipelines,
 [`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
-at the top of your pipeline to route all subsequent reports to a log
-file automatically:
+routes all subsequent reports to a log file, which is useful for
+debugging issues after the fact:
 
 ``` r
 
@@ -924,19 +817,10 @@ set_log_file("logs/join_diagnostics.log")
 # All join_spy() / join_explain() calls now append to this file
 ```
 
-This is especially useful when debugging issues days or weeks after the
-pipeline ran; the log tells you exactly what the key distributions
-looked like at join time.
-
-The pattern is: diagnose strings first, then structure, then
-cardinality. String problems are invisible and common. Structural
-problems are visible once you know to look. If you find yourself
-repeating this workflow across multiple joins in the same pipeline,
-consider using
+For pipelines with multiple joins,
 [`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
-to diagnose an entire sequence of joins at once; it applies the same
-checks to every step and reports where the first problem enters the
-chain.
+diagnoses an entire sequence at once, reporting where the first problem
+enters the chain.
 
 ## See Also
 

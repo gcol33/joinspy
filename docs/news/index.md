@@ -1,5 +1,41 @@
 # Changelog
 
+## joinspy 0.8.0
+
+CRAN release: 2026-03-31
+
+### Multi-Backend Join Support
+
+- Join wrappers
+  ([`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md),
+  [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md),
+  etc.) now auto-detect input class and dispatch to the native join
+  engine: tibble inputs use dplyr, data.table inputs use data.table,
+  plain data.frames use base R
+  [`merge()`](https://rdrr.io/r/base/merge.html)
+- New `backend` parameter for explicit override (`"base"`, `"dplyr"`,
+  `"data.table"`)
+- Class preserved through the full diagnose-repair-join cycle
+- Graceful fallback to base R with a warning if the detected backend
+  package is not installed
+
+### Documentation Overhaul
+
+- README reframed around string-level key diagnostics (whitespace, case,
+  encoding, typos) as the primary value proposition
+- Three new vignettes: “Why Your Keys Don’t Match” (real-world
+  scenarios), “Joins in Production” (pipelines, logging, guards),
+  “Working with Backends” (tibble/data.table/base R)
+- Existing vignettes (quickstart, common-issues) expanded from 850 to
+  4,500+ prose words
+
+### Testing
+
+- 46 new backend tests covering auto-detection, explicit override, named
+  `by` vectors, class preservation, and all three backends
+
+------------------------------------------------------------------------
+
 ## joinspy 0.7.2
 
 ### Testing & Quality

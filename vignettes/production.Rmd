@@ -215,6 +215,7 @@ join_strict(
 The four cardinality levels:
 
 - **1:1** -- lookup to lookup. Each key appears exactly once on both sides.
+
 - **1:m** -- reference on the left, transactions on the right (products to
   line items, stations to hourly readings).
 - **m:1** -- transactions on the left, lookup on the right (sales joined to a

@@ -103,18 +103,18 @@ data.table.</p>
 <div class="section level2">
 <h2 id="string-diagnostics">String Diagnostics<a class="anchor" aria-label="anchor" href="#string-diagnostics"></a>
 </h2>
-<p>Most failed joins are not caused by missing data. They fail because
-the keys <em>look</em> identical but are not: a trailing space, a case
-mismatch, an invisible Unicode character. These problems are hard to
-spot by eye and rarely show up in <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> or
-<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>. joinspy was built to catch them.</p>
+<p>The keys <em>look</em> identical but differ at the byte level: a
+trailing space, a case mismatch, an invisible Unicode character. These
+differences don’t show up in <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> or
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> output, but they determine whether a join
+matches.</p>
 <div class="section level3">
 <h3 id="whitespace">Whitespace<a class="anchor" aria-label="anchor" href="#whitespace"></a>
 </h3>
-<p>Trailing and leading whitespace is the single most common reason keys
-fail to match. A column exported from Excel or read from a CSV will
-often contain <code>"London "</code> alongside <code>"London"</code>,
-and R sees those as two distinct values.</p>
+<p>Trailing and leading whitespace is the most common reason keys fail
+to match. A column exported from Excel might contain
+<code>"London "</code> alongside <code>"London"</code>, and R treats
+those as distinct values.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sales</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  city <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"London"</span>, <span class="st">"Paris "</span>, <span class="st">" Berlin"</span>, <span class="st">"Tokyo"</span><span class="op">)</span>,</span>
@@ -129,14 +129,10 @@ and R sees those as two distinct values.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">sales</span>, <span class="va">cities</span>, by <span class="op">=</span> <span class="st">"city"</span><span class="op">)</span></span></code></pre></div>
-<p>Once printed, the report flags the whitespace problems and tells you
-exactly which values are affected. The <code>match_analysis</code>
-section shows what the match rate would be if those issues were fixed;
-here, <code>"Paris "</code> and <code>" Berlin"</code> both fail to
-match their clean counterparts, dropping the match rate from 100% to
-50%.</p>
-<p>Whitespace problems compound when keys span multiple columns. Suppose
-you join on both city and district:</p>
+<p>The report flags the whitespace problems and shows which values are
+affected. <code>"Paris "</code> and <code>" Berlin"</code> both fail to
+match, dropping the match rate from 100% to 50%.</p>
+<p>Whitespace problems compound with multi-column keys:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sales2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  city <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"London"</span>, <span class="st">"Paris "</span>, <span class="st">"Berlin"</span><span class="op">)</span>,</span>
@@ -153,31 +149,24 @@ you join on both city and district:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">sales2</span>, <span class="va">districts</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"city"</span>, <span class="st">"district"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>Now London fails on the district column and Paris fails on the city
-column. Each column is checked independently; a row needs all key
-columns to match, so a single trailing space in any one of them is
-enough to break the join.</p>
-<p>For a quick pass/fail gate in scripts, use
-<code><a href="../reference/key_check.html">key_check()</a></code>:</p>
+<p>London fails on the district column, Paris on the city column. A row
+needs all key columns to match, so a single trailing space in any column
+breaks the join.</p>
+<p>For a quick pass/fail gate, we can use <code><a href="../reference/key_check.html">key_check()</a></code>:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">sales</span>, <span class="va">cities</span>, by <span class="op">=</span> <span class="st">"city"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Key check found 1 issue(s):</span></span>
 <span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> Left table column 'city' has whitespace issues (2 values)</span></span></code></pre></div>
 <p><code><a href="../reference/key_check.html">key_check()</a></code> returns <code>FALSE</code> here because of
-the whitespace. When <code>warn = TRUE</code> (the default), it also
-prints which issues it found. This makes <code><a href="../reference/key_check.html">key_check()</a></code> useful
-as an assertion in automated pipelines: wrap it in
-<code><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot()</a></code> and the script halts before a broken join
-silently drops rows. Unlike <code><a href="../reference/join_spy.html">join_spy()</a></code>, which returns a
-full report object, <code><a href="../reference/key_check.html">key_check()</a></code> is deliberately minimal (a
-single logical value) so it slots cleanly into conditional logic.</p>
+the whitespace, and with <code>warn = TRUE</code> (the default) it
+prints which issues it found. It returns a single logical, so it slots
+into <code><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot()</a></code> or conditional logic.</p>
 </div>
 <div class="section level3">
 <h3 id="case-mismatches">Case Mismatches<a class="anchor" aria-label="anchor" href="#case-mismatches"></a>
 </h3>
-<p>Databases and spreadsheets handle case differently. A CRM might store
-<code>"ACME"</code> while the billing system stores <code>"Acme"</code>,
-and R treats these as distinct strings.</p>
+<p>A CRM might store <code>"ACME"</code> while the billing system stores
+<code>"Acme"</code>, and R treats these as distinct strings.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">invoices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  company <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ACME"</span>, <span class="st">"globex"</span>, <span class="st">"Initech"</span>, <span class="st">"UMBRELLA"</span><span class="op">)</span>,</span>
@@ -192,23 +181,16 @@ and R treats these as distinct strings.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">invoices</span>, <span class="va">vendors</span>, by <span class="op">=</span> <span class="st">"company"</span><span class="op">)</span></span></code></pre></div>
-<p>Each case-mismatched pair is listed in the output. Only
-<code>"Initech"</code> matches exactly; the other three would be lost in
-a standard join. Case conflicts are particularly common when merging
-data from systems with different conventions: CRMs that uppercase
-everything, ERPs that title-case, web forms that accept freeform input.
-The <code>match_analysis</code> section of the report shows the
-potential match rate both with and without case sensitivity, so you can
-gauge whether standardizing case would recover most of the lost
-matches.</p>
+<p>Only <code>"Initech"</code> matches exactly; the other three would be
+lost in a standard join. The <code>match_analysis</code> section shows
+the potential match rate both with and without case sensitivity.</p>
 </div>
 <div class="section level3">
 <h3 id="encoding-and-invisible-characters">Encoding and Invisible Characters<a class="anchor" aria-label="anchor" href="#encoding-and-invisible-characters"></a>
 </h3>
-<p>Encoding issues are the nastiest. Nothing visible to debug. Two
-strings render identically in the console but differ at the byte level:
-a non-breaking space (<code>\u00A0</code>) versus a regular space, a
-Latin-1 accented character versus its UTF-8 equivalent.</p>
+<p>Two strings can render identically in the console but differ at the
+byte level: a non-breaking space (<code>\u00A0</code>) versus a regular
+space, a zero-width space from PDF copy-paste.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Simulate invisible character contamination</span></span>
 <span><span class="va">raw_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -225,23 +207,15 @@ Latin-1 accented character versus its UTF-8 equivalent.</p>
 <span></span>
 <span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">raw_ids</span>, <span class="va">clean_ids</span>, by <span class="op">=</span> <span class="st">"product_id"</span><span class="op">)</span></span></code></pre></div>
 <p>The zero-width space appended to <code>"SKU-003"</code> is invisible
-when printed but prevents the join from matching. joinspy flags this
-under encoding issues. Other common culprits include non-breaking spaces
-(<code>\u00A0</code>), byte-order marks, and right-to-left marks that
-creep in from PDF copy-paste or web scraping. Standard R string
-functions (<code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code>, <code><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar()</a></code>) will not catch
-these because they operate on visible characters only. By identifying
-the specific Unicode code points involved, joinspy saves considerable
-debugging time compared to staring at two strings that look identical in
-the console.</p>
+when printed but prevents the match. joinspy flags this under encoding
+issues and identifies the specific Unicode code points involved.</p>
 </div>
 <div class="section level3">
 <h3 id="combining-multiple-issues">Combining Multiple Issues<a class="anchor" aria-label="anchor" href="#combining-multiple-issues"></a>
 </h3>
-<p>Real data rarely has just one problem. A single key column might have
-trailing whitespace on some rows, case mismatches on others, invisible
-characters on a third set. <code><a href="../reference/join_spy.html">join_spy()</a></code> checks for all of
-these in one call and reports them together, grouped by type.</p>
+<p>Real data rarely has just one problem. <code><a href="../reference/join_spy.html">join_spy()</a></code> checks
+for whitespace, case, and encoding issues in one call and reports them
+together, grouped by type.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">employees</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  dept <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sales "</span>, <span class="st">"ENGINEERING"</span>, <span class="st">"marketing"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"HR"</span>, <span class="st">"\u00A0"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -256,23 +230,17 @@ these in one call and reports them together, grouped by type.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">employees</span>, <span class="va">departments</span>, by <span class="op">=</span> <span class="st">"dept"</span><span class="op">)</span></span></code></pre></div>
-<p>Zero matches out of four rows. Grouped by problem type (whitespace,
-case, encoding), the output lets you decide how to address each one.
-This matters because the fix differs: whitespace is safe to trim
-automatically, case standardization requires choosing a direction
-(upper, lower, or title), and encoding issues sometimes indicate deeper
-data pipeline problems that trimming alone will not solve. The grouped
-output lets you prioritize; often fixing whitespace and case recovers
-90% of lost matches, and the remaining encoding problems can be handled
-case by case.</p>
+<p>Zero matches out of four rows, with the problems grouped by type. The
+fix differs per category: whitespace is safe to trim automatically, case
+standardization requires choosing a direction, and encoding issues may
+indicate deeper pipeline problems.</p>
 </div>
 <div class="section level3">
 <h3 id="duplicate-keys">Duplicate Keys<a class="anchor" aria-label="anchor" href="#duplicate-keys"></a>
 </h3>
-<p>Duplicates do not prevent matches, but they multiply rows. If
+<p>Duplicates don’t prevent matches, but they multiply rows. If
 <code>"London"</code> appears three times in the left table and twice in
-the right, you get six rows for London after an inner join, often
-unintentionally.</p>
+the right, we get six rows for London after an inner join.</p>
 <p><code><a href="../reference/key_duplicates.html">key_duplicates()</a></code> returns the offending rows along with a
 count:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
@@ -290,29 +258,23 @@ count:</p>
 <span><span class="co">#&gt; 4       S3 Mon    300             3</span></span>
 <span><span class="co">#&gt; 5       S3 Tue    250             3</span></span>
 <span><span class="co">#&gt; 6       S3 Wed    400             3</span></span></code></pre></div>
-<p>Use <code>keep = "first"</code> or <code>keep = "last"</code> to
-return only the first or last occurrence per key. The default
-<code>keep = "all"</code> returns every row that participates in a
-duplicate group. The <code>.n_duplicates</code> column in the output
-tells you the group size, which directly maps to the row multiplication
-factor: a key with <code>.n_duplicates = 3</code> in the left table and
-<code>.n_duplicates = 2</code> in the right will produce 6 rows for that
-key in an inner join.</p>
+<p>The <code>keep</code> argument accepts <code>"first"</code>,
+<code>"last"</code>, or the default <code>"all"</code>. The
+<code>.n_duplicates</code> column maps directly to the row
+multiplication factor in a join.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="auto-repair">Auto-Repair<a class="anchor" aria-label="anchor" href="#auto-repair"></a>
 </h2>
-<p>Once you know what is wrong, joinspy can fix it.
-<code><a href="../reference/join_repair.html">join_repair()</a></code> handles whitespace trimming, case
+<p><code><a href="../reference/join_repair.html">join_repair()</a></code> handles whitespace trimming, case
 standardization, invisible character removal, and empty-to-NA conversion
 in a single call.</p>
 <div class="section level3">
 <h3 id="dry-run">Dry Run<a class="anchor" aria-label="anchor" href="#dry-run"></a>
 </h3>
-<p>Always preview repairs before applying them. The
-<code>dry_run = TRUE</code> option shows what would change without
-modifying the data:</p>
+<p>We can preview what <code><a href="../reference/join_repair.html">join_repair()</a></code> would change with
+<code>dry_run = TRUE</code>:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">messy_left</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">" A-101"</span>, <span class="st">"B-202 "</span>, <span class="st">"c-303"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"D-404"</span>, <span class="st">"\u200B"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -333,19 +295,14 @@ modifying the data:</p>
 <span><span class="co">#&gt; ── <span style="font-weight: bold;">Left table (x)</span> ──</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">id</span>: trimmed whitespace (2), removed invisible chars (1)</span></span></code></pre></div>
-<p>The dry run tells you how many values will change and in which
-direction, without touching the original data frames. Review this output
-carefully: it shows which values will be modified and what they will
-become. Review carefully for case standardization, where uppercasing a
-key like <code>"c-303"</code> to <code>"C-303"</code> is correct, but
-you want to verify that both tables agree on the target format before
-committing.</p>
+<p>The dry run shows how many values will change and what they become,
+without touching the original data.</p>
 </div>
 <div class="section level3">
 <h3 id="applying-repairs">Applying Repairs<a class="anchor" aria-label="anchor" href="#applying-repairs"></a>
 </h3>
 <p>Drop <code>dry_run</code> (or set it to <code>FALSE</code>) to get
-back the repaired data frames. When you pass both <code>x</code> and
+back the repaired data frames. When we pass both <code>x</code> and
 <code>y</code>, the return value is a list with both:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span></span>
@@ -361,33 +318,22 @@ back the repaired data frames. When you pass both <code>x</code> and
 <span><span class="co">#&gt; [1] "A-101" "B-202" "C-303" "D-404"</span></span>
 <span><span class="va">repaired</span><span class="op">$</span><span class="va">y</span><span class="op">$</span><span class="va">id</span></span>
 <span><span class="co">#&gt; [1] "A-101" "B-202" "C-303" "D-404"</span></span></code></pre></div>
-<p>Both sides now have clean, uppercase, whitespace-free keys. You can
-pass the repaired tables straight into a join.</p>
-<p>To confirm the repairs worked, run <code><a href="../reference/key_check.html">key_check()</a></code> on the
-repaired tables:</p>
+<p>Both sides now have clean, uppercase, whitespace-free keys. We can
+confirm with <code><a href="../reference/key_check.html">key_check()</a></code>:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Key check passed: no issues detected</span></span></code></pre></div>
-<p>This should return <code>TRUE</code> with no warnings. Running
-<code><a href="../reference/key_check.html">key_check()</a></code> after repair is good practice because it
-catches edge cases where trimming or case standardization was not enough
-(for instance, if two distinct keys collapse into the same value after
-uppercasing).</p>
-<p>One important caveat: <code><a href="../reference/join_repair.html">join_repair()</a></code> fixes mechanical
-string problems: whitespace, case, invisible characters, empty strings.
-It does not fix typos, semantic mismatches, or fundamentally different
-key formats. If one table uses <code>"USA"</code> and the other uses
-<code>"United States"</code>, or one stores product codes as
-<code>"P-001"</code> while the other uses <code>"001"</code>, repair
-will not bridge that gap. Those require manual recoding or a lookup
-table.</p>
+<p><code><a href="../reference/join_repair.html">join_repair()</a></code> fixes mechanical string problems:
+whitespace, case, invisible characters, empty strings. It does not fix
+typos, semantic mismatches, or different key formats (<code>"USA"</code>
+vs. <code>"United States"</code>).</p>
 </div>
 <div class="section level3">
 <h3 id="repair-suggestions-from-a-report">Repair Suggestions from a Report<a class="anchor" aria-label="anchor" href="#repair-suggestions-from-a-report"></a>
 </h3>
-<p>If you already have a <code>JoinReport</code> from
-<code><a href="../reference/join_spy.html">join_spy()</a></code>, call <code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> to get
-ready-to-run R code that fixes the detected issues:</p>
+<p>If we already have a <code>JoinReport</code> from
+<code><a href="../reference/join_spy.html">join_spy()</a></code>, <code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> generates
+ready-to-run code that fixes the detected issues:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">messy_left</span>, <span class="va">messy_right</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
@@ -399,11 +345,8 @@ ready-to-run R code that fixes the detected issues:</p>
 <span><span class="co">#&gt; <span style="color: #8787AF;"># Standardize case:</span></span></span>
 <span><span class="co">#&gt; x<span style="color: #D7AF00;">$</span>id <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>x<span style="color: #D7AF00;">$</span>id<span style="color: #D7AF00;">)</span></span></span>
 <span><span class="co">#&gt; y<span style="color: #D7AF00;">$</span>id <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>y<span style="color: #D7AF00;">$</span>id<span style="color: #D7AF00;">)</span></span></span></code></pre></div>
-<p>This prints code snippets you can copy into your script. It is
-deliberately not automatic: you should review the suggestions before
-running them. The generated code calls <code><a href="../reference/join_repair.html">join_repair()</a></code> with
-the appropriate flags enabled based on what the report detected, so you
-do not have to remember which issues were present.</p>
+<p>The generated code calls <code><a href="../reference/join_repair.html">join_repair()</a></code> with the
+appropriate flags based on what the report detected.</p>
 </div>
 </div>
 <div class="section level2">
@@ -411,8 +354,7 @@ do not have to remember which issues were present.</p>
 </h2>
 <p>Every <code>JoinReport</code> includes an <code>expected_rows</code>
 component that predicts how many rows each join type will produce,
-calculated from the key overlap and duplicate structure, before any join
-is executed.</p>
+calculated from key overlap and duplicate structure.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"P1"</span>, <span class="st">"P1"</span>, <span class="st">"P2"</span>, <span class="st">"P3"</span>, <span class="st">"P4"</span><span class="op">)</span>,</span>
@@ -439,21 +381,16 @@ is executed.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $full</span></span>
 <span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
-<p>The predictions help you anticipate whether a join will shrink, grow,
-or explode your data. A left join here should retain all five order rows
-(with <code>NA</code> for the unmatched <code>"P4"</code>), while an
-inner join drops it.</p>
-<p>How does joinspy compute these numbers? For each join type, it counts
-the overlapping keys between the two tables and multiplies by the number
-of duplicates on each side. A key that appears twice in <code>x</code>
-and three times in <code>y</code> contributes 2 * 3 = 6 rows to an inner
-join. Non-matching keys add rows for left, right, and full joins
-according to the usual rules. The calculation is exact when all keys are
-non-NA and no string issues remain; however, NA keys deserve caution.
-R’s <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> does not match NAs by default (and neither does
-dplyr), so if either table contains NA keys, the predicted row count may
-overestimate the actual result. The report warns you when NAs are
-present in the key columns so you can account for this.</p>
+<p>A left join here retains all five order rows (with <code>NA</code>
+for the unmatched <code>"P4"</code>), while an inner join drops it.</p>
+<p>For each join type, the calculation counts overlapping keys and
+multiplies by the number of duplicates on each side. A key appearing
+twice in <code>x</code> and three times in <code>y</code> contributes 2
+* 3 = 6 rows to an inner join. The calculation is exact when all keys
+are non-NA and no string issues remain. NA keys deserve caution: R’s
+<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and dplyr both skip NAs by default, so the
+predicted count may overestimate. The report warns when NAs are
+present.</p>
 <p><code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> returns the same information as a compact data
 frame:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
@@ -476,13 +413,13 @@ frame:</p>
 <div class="section level2">
 <h2 id="post-join-diagnostics">Post-Join Diagnostics<a class="anchor" aria-label="anchor" href="#post-join-diagnostics"></a>
 </h2>
-<p>Sometimes the join has already happened and you need to understand
-the result.</p>
+<p>Sometimes the join has already happened and we need to understand the
+result.</p>
 <div class="section level3">
 <h3 id="explaining-row-count-changes">Explaining Row Count Changes<a class="anchor" aria-label="anchor" href="#explaining-row-count-changes"></a>
 </h3>
 <p><code><a href="../reference/join_explain.html">join_explain()</a></code> takes the result, the two input tables,
-and the join column, then tells you why the row count changed:</p>
+and the join column, then explains why the row count changed:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tickets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  event_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>,</span>
@@ -512,16 +449,10 @@ and the join column, then tells you why the row count changed:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Left table has 1 duplicate key(s) - each match creates multiple rows</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Inner join dropped 1 unmatched left rows</span></span></code></pre></div>
-<p>The output breaks down the row count into contributions from matched
-keys, unmatched keys, and duplicate-driven expansion. Specifically, you
-get: the number of keys that matched in both tables; how many rows each
-matched key contributed (accounting for duplicates); which keys from
-each table had no match; and the net effect on row count compared to the
-left table. This decomposition makes it straightforward to answer
-questions like “why did my table grow by 200 rows?”, and usually the
-answer is a handful of keys with unexpected duplicates on one side. If
-you omit <code>type</code>, joinspy infers the join type from the row
-counts (though providing it explicitly is more reliable).</p>
+<p>The output decomposes the row count into contributions from matched
+keys, unmatched keys, and duplicate-driven expansion. Usually when a
+table grows unexpectedly, the answer is a handful of keys with
+duplicates on one side.</p>
 </div>
 <div class="section level3">
 <h3 id="beforeafter-comparison">Before/After Comparison<a class="anchor" aria-label="anchor" href="#beforeafter-comparison"></a>
@@ -562,8 +493,7 @@ join to show which rows were added, dropped, or preserved:</p>
 <span><span class="co">#&gt; Unique keys after: <span style="color: #0000BB;">5</span></span></span></code></pre></div>
 <p>Row 1 was dropped (no match in the right table for a non-full join is
 irrelevant here since we used <code>all = TRUE</code>; but row 5 was
-added from the right table). This kind of accounting is tedious to do by
-hand on large data.</p>
+added from the right table).</p>
 <p>Here is a second example that highlights row addition from duplicates
 rather than new keys:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
@@ -599,12 +529,11 @@ rather than new keys:</p>
 <span><span class="co">#&gt; Unique keys before: <span style="color: #0000BB;">3</span></span></span>
 <span><span class="co">#&gt; Unique keys after: <span style="color: #0000BB;">3</span></span></span>
 <span><span class="co">#&gt; Duplicate rows: <span style="color: #0000BB;">"+2"</span></span></span></code></pre></div>
-<p>Here the row count grew from three to four because
-<code>id = 1</code> matched two rows in the lookup. No new keys were
-introduced; the growth came entirely from duplicate-driven expansion.
-<code><a href="../reference/join_diff.html">join_diff()</a></code> distinguishes these two sources of row addition
-(new keys vs. duplicate expansion), which is the key information you
-need when debugging an unexpectedly large result.</p>
+<p>The row count grew from three to four because <code>id = 1</code>
+matched two rows in the lookup. No new keys were introduced; the growth
+came entirely from duplicate expansion. <code><a href="../reference/join_diff.html">join_diff()</a></code>
+distinguishes these two sources of row addition (new keys vs. duplicate
+expansion).</p>
 </div>
 </div>
 <div class="section level2">
@@ -662,25 +591,19 @@ joined data frame:</p>
 <span><span class="co">#&gt; 3        P03  45     NA</span></span></code></pre></div>
 <p>All four wrappers (<code>left_join_spy</code>,
 <code>right_join_spy</code>, <code>inner_join_spy</code>,
-<code>full_join_spy</code>) share the same interface.</p>
-<p>When should you use a wrapper instead of calling
-<code><a href="../reference/join_spy.html">join_spy()</a></code> manually? The wrappers are convenient for
-exploratory work and interactive sessions where you want diagnostics
-printed as a side effect without breaking your pipeline. In production
-scripts, you may prefer calling <code><a href="../reference/join_spy.html">join_spy()</a></code> first,
-inspecting the report programmatically (checking
-<code>report$issues</code> or <code>report$expected_rows</code>), and
-only proceeding with the join if the diagnostics pass. The wrappers also
-accept a <code>backend</code> parameter (<code>"base"</code>,
-<code>"dplyr"</code>, or <code>"data.table"</code>) that overrides the
-automatic backend detection; this is useful when you want to force a
-specific join engine regardless of the input class.</p>
+<code>full_join_spy</code>) share the same interface. The wrappers are
+convenient for exploratory work; in production, we might prefer calling
+<code><a href="../reference/join_spy.html">join_spy()</a></code> first and inspecting the report programmatically
+before proceeding. The wrappers also accept a <code>backend</code>
+parameter (<code>"base"</code>, <code>"dplyr"</code>, or
+<code>"data.table"</code>) that overrides automatic backend
+detection.</p>
 <div class="section level3">
 <h3 id="quiet-mode-and-deferred-reports">Quiet Mode and Deferred Reports<a class="anchor" aria-label="anchor" href="#quiet-mode-and-deferred-reports"></a>
 </h3>
-<p>In pipelines, printed output is distracting. Use
-<code>.quiet = TRUE</code> to suppress the report, then retrieve it
-afterward with <code><a href="../reference/last_report.html">last_report()</a></code>:</p>
+<p>In pipelines, printed output can be distracting. With
+<code>.quiet = TRUE</code>, the report is suppressed and can be
+retrieved afterward via <code><a href="../reference/last_report.html">last_report()</a></code>:</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/inner_join_spy.html">inner_join_spy</a></span><span class="op">(</span><span class="va">patients</span>, <span class="va">labs</span>, by <span class="op">=</span> <span class="st">"patient_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -688,21 +611,17 @@ afterward with <code><a href="../reference/last_report.html">last_report()</a></
 <span><span class="va">rpt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/last_report.html">last_report</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span></span>
 <span><span class="co">#&gt; [1] 0.6666667</span></span></code></pre></div>
-<p><code><a href="../reference/last_report.html">last_report()</a></code> always returns the report from the most
-recent <code>*_join_spy()</code> call, regardless of which wrapper was
-used. The report object is stored in an internal environment and
-persists for the duration of the R session, so you can inspect it at any
-point after the join – even after several more lines of pipeline code
-have executed.</p>
+<p><code><a href="../reference/last_report.html">last_report()</a></code> returns the report from the most recent
+<code>*_join_spy()</code> call and persists for the duration of the R
+session.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="cardinality-enforcement">Cardinality Enforcement<a class="anchor" aria-label="anchor" href="#cardinality-enforcement"></a>
 </h2>
-<p><code><a href="../reference/join_strict.html">join_strict()</a></code> performs a join that throws an error if
-the key relationship violates your expectation. This is useful as a
-guard in production scripts where a surprise many-to-many relationship
-would corrupt downstream results.</p>
+<p><code><a href="../reference/join_strict.html">join_strict()</a></code> performs a join that errors if the key
+relationship violates a stated expectation. This is a guard against
+unexpected many-to-many joins that multiply rows.</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sensors</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  sensor_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"T1"</span>, <span class="st">"T2"</span>, <span class="st">"T3"</span><span class="op">)</span>,</span>
@@ -734,38 +653,26 @@ would corrupt downstream results.</p>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Cardinality violation: expected 1:1 but found 1:m</span></span>
 <span><span class="co">#&gt;   Left duplicates: 0, Right duplicates: 1</span></span></code></pre></div>
-<p>The <code>expect</code> argument accepts four cardinality levels,
-each appropriate for different scenarios:</p>
+<p>The <code>expect</code> argument accepts four cardinality levels:</p>
 <ul>
-<li>
-<code>"1:1"</code>: both sides have unique keys. Use this when
-merging two reference tables (e.g., a country table with a currency
-table, both keyed on country code). Any duplicate on either side is an
-error.</li>
-<li>
-<code>"1:m"</code>: the left table has unique keys, the right may
-repeat. This is the classic lookup-table join: a product catalogue
-(left) joined to a transactions table (right) where each product appears
-in many transactions.</li>
-<li>
-<code>"m:1"</code>: the mirror of <code>"1:m"</code>. The right
-table is the lookup; the left table has repeats.</li>
-<li>
-<code>"m:m"</code>: duplicates are allowed on both sides. This
-disables the constraint entirely and is rarely what you want; it exists
-as an explicit opt-in for the rare cases where a Cartesian product per
-key is intentional (e.g., generating all pairings between two sets of
-attributes).</li>
+<li><p><code>"1:1"</code>: both sides have unique keys. Any duplicate on
+either side is an error.</p></li>
+<li><p><code>"1:m"</code>: the left table has unique keys, the right may
+repeat. The classic lookup-table join.</p></li>
+<li><p><code>"m:1"</code>: the mirror of <code>"1:m"</code>. The right
+table is the lookup.</p></li>
+<li><p><code>"m:m"</code>: duplicates allowed on both sides. Rarely what
+we want; exists as an explicit opt-in for intentional Cartesian products
+per key.</p></li>
 </ul>
 <p>To detect the actual cardinality without enforcing anything:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/detect_cardinality.html">detect_cardinality</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings_dup</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"1:m"</span></span></span>
 <span><span class="co">#&gt; Right duplicates: <span style="color: #0000BB;">1</span> key(s)</span></span></code></pre></div>
-<p>This returns a string like <code>"1:m"</code> that you can use
-programmatically. You might use this in a script to select the right
-<code>expect</code> value for <code><a href="../reference/join_strict.html">join_strict()</a></code> dynamically, or
-to log the cardinality of a join for monitoring purposes.</p>
+<p>This returns a string like <code>"1:m"</code> that we can use
+programmatically, e.g. to select the right <code>expect</code> value or
+to log the cardinality for monitoring.</p>
 </div>
 <div class="section level2">
 <h2 id="advanced-features">Advanced Features<a class="anchor" aria-label="anchor" href="#advanced-features"></a>
@@ -773,10 +680,10 @@ to log the cardinality of a join for monitoring purposes.</p>
 <div class="section level3">
 <h3 id="cartesian-product-detection">Cartesian Product Detection<a class="anchor" aria-label="anchor" href="#cartesian-product-detection"></a>
 </h3>
-<p>When both tables have duplicates on the same key, a join produces the
-Cartesian product of those duplicates. Two keys with 100 rows each?
-10,000 rows for that key alone. <code><a href="../reference/check_cartesian.html">check_cartesian()</a></code> warns you
-before this happens:</p>
+<p>When both tables have duplicates on the same key, the join produces
+the Cartesian product of those duplicates. Two keys with 100 rows each
+produce 10,000 rows for that key alone. <code><a href="../reference/check_cartesian.html">check_cartesian()</a></code>
+warns before this happens:</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">left</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  group <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"A"</span>, <span class="st">"A"</span>, <span class="st">"B"</span><span class="op">)</span>,</span>
@@ -793,16 +700,13 @@ before this happens:</p>
 <span><span class="fu"><a href="../reference/check_cartesian.html">check_cartesian</a></span><span class="op">(</span><span class="va">left</span>, <span class="va">right</span>, by <span class="op">=</span> <span class="st">"group"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> No Cartesian product risk (expansion factor: <span style="color: #0000BB;">2</span>x)</span></span></code></pre></div>
 <p>The <code>threshold</code> argument (default 10) controls how large
-the expansion factor must be before a warning is triggered. Set it lower
-for interactive work where you want early warnings; set it higher in
-batch scripts where moderate expansion is expected and you only want to
-catch truly pathological cases.</p>
+the expansion factor must be before a warning fires.</p>
 </div>
 <div class="section level3">
 <h3 id="multi-table-join-chains">Multi-Table Join Chains<a class="anchor" aria-label="anchor" href="#multi-table-join-chains"></a>
 </h3>
 <p><code><a href="../reference/analyze_join_chain.html">analyze_join_chain()</a></code> runs diagnostics across a sequence
-of joins. You provide a named list of tables and a list of join
+of joins. We provide a named list of tables and a list of join
 specifications:</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -853,14 +757,11 @@ specifications:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Total issues across chain: <span style="color: #0000BB;">2</span></span></span></code></pre></div>
 <p>Each step prints a diagnostic report. The special name
-<code>"result"</code> in the second step refers to the output of the
-previous join, so you can chain as many tables as needed. This
-placeholder is resolved internally: after the first join produces an
-intermediate table, <code>"result"</code> is swapped in as the left (or
-right) table for the next step. This means key diagnostics at step two
-operate on the actual intermediate data, not on the original input,
-which is important because the first join may have introduced NAs or
-changed the key distribution.</p>
+<code>"result"</code> refers to the output of the previous join, so we
+can chain as many tables as needed. Because <code>"result"</code>
+resolves to the actual intermediate data, key diagnostics at step two
+account for any NAs or key distribution changes introduced by the first
+join.</p>
 </div>
 <div class="section level3">
 <h3 id="backend-support">Backend Support<a class="anchor" aria-label="anchor" href="#backend-support"></a>
@@ -868,19 +769,16 @@ changed the key distribution.</p>
 <p>All join wrappers and <code><a href="../reference/join_strict.html">join_strict()</a></code> accept a
 <code>backend</code> argument. By default (<code>backend = NULL</code>),
 joinspy detects the backend from the input class: tibbles use dplyr,
-data.tables use data.table, and plain data frames use base R. You can
-override this:</p>
+data.tables use data.table, plain data frames use base R.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Force dplyr backend even for plain data frames</span></span>
 <span><span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, by <span class="op">=</span> <span class="st">"id"</span>, backend <span class="op">=</span> <span class="st">"dplyr"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Force base R for tibbles</span></span>
 <span><span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span>, by <span class="op">=</span> <span class="st">"id"</span>, backend <span class="op">=</span> <span class="st">"base"</span><span class="op">)</span></span></code></pre></div>
-<p>The three backends are <code>"base"</code>, <code>"dplyr"</code>, and
-<code>"data.table"</code>. The diagnostic layer is backend-agnostic; all
-string analysis and key checking happens before the join engine is
-invoked, so the reports are identical regardless of which backend
-performs the actual merge.</p>
+<p>The diagnostic layer is backend-agnostic; all string analysis and key
+checking happens before the join engine is invoked, so reports are
+identical regardless of backend.</p>
 </div>
 </div>
 <div class="section level2">

@@ -1,26 +1,17 @@
 # Joins in Production
 
-Interactive analysis and production scripts have different failure
-modes. When you explore data at the console, a bad join is annoying but
-recoverable: you see the wrong row count, swear, fix the key, and
-re-run. In a scheduled script that feeds a dashboard or triggers
-downstream jobs, that same bad join silently corrupts everything it
-touches. Nobody notices until a stakeholder files a ticket three weeks
-later.
-
-joinspy was built with both contexts in mind, but this vignette focuses
-exclusively on the second one: wiring joinspy into automated pipelines
-so that join problems surface as errors or log entries rather than
-silent data corruption. Every example here uses synthetic data and
-[`tempfile()`](https://rdrr.io/r/base/tempfile.html) paths, so you can
-run the vignette end to end without touching your filesystem.
+At the console, we see the wrong row count, fix the key, and re-run. In
+a scheduled script, the same issue goes unnoticed until someone looks at
+the output. This vignette wires joinspy into automated pipelines so that
+join problems surface as errors or log entries. Every example uses
+synthetic data and [`tempfile()`](https://rdrr.io/r/base/tempfile.html)
+paths, so the whole thing runs end to end.
 
 ## Assertions with key_check()
 
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-returns a single logical: `TRUE` if no issues were detected, `FALSE`
-otherwise. That makes it a natural fit for assertions. The simplest
-pattern wraps it in
+returns a single logical – `TRUE` if no issues were detected, `FALSE`
+otherwise. The simplest assertion wraps it in
 [`stopifnot()`](https://rdrr.io/r/base/stopifnot.html):
 
 ``` r
@@ -56,11 +47,9 @@ stopifnot(key_check(orders_dirty, customers, by = "customer_id", warn = FALSE))
 #> ! key_check(orders_dirty, customers, by = "customer_id", warn = FALSE) is not TRUE
 ```
 
-The `warn = FALSE` argument suppresses the printed diagnostics. In a
-cron job or CI pipeline, you generally want the script to fail hard and
-fast rather than print warnings that nobody reads. If you need more
-control over the error message, use an explicit `if`/`stop` pattern
-instead:
+With `warn = FALSE`, the printed diagnostics are suppressed – in a cron
+job or CI pipeline, we want the script to fail hard rather than print
+warnings. An explicit `if`/`stop` gives us a custom error message:
 
 ``` r
 
@@ -72,13 +61,9 @@ if (!key_check(orders_dirty, customers, by = "customer_id", warn = FALSE)) {
 #> ! Key quality check failed for orders-customers join. Run join_spy() interactively for details.
 ```
 
-This is more verbose but gives you a custom error message that can
-include the table names, the pipeline step, or a link to documentation.
-You choose the tradeoff.
-
-A common pattern chains the assertion with a repair step. Run
+We can also chain the assertion with a repair step – run
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-first; if it fails, repair and re-check:
+first, repair on failure, then re-check:
 
 ``` r
 
@@ -101,35 +86,22 @@ if (!ok) {
 #> ✔ Repaired 2 value(s)
 ```
 
-When should you use
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-versus
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)?
-They serve different roles.
-[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-is a gate, a binary pass/fail that costs almost nothing to run.
+is a binary pass/fail gate;
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-is a detailed diagnostic that builds a full report object with match
-rates, expected row counts, and categorized issues. In a production
-script,
+builds a full report with match rates, expected row counts, and
+categorized issues. In production,
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-is the assertion you run on every execution;
+runs on every execution.
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-is what you pull out when the assertion fails and you need to understand
-why. Calling
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-on every run is fine for moderate-sized tables, but for million-row
-datasets the overhead adds up, and
-[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-is the leaner choice.
+is what we reach for when an assertion fails and we need to understand
+why.
 
 ## Silent Joins in Pipelines
 
-The `*_join_spy()` wrappers print diagnostic output by default. That
-output is helpful when you are working interactively; it is noise in a
-scheduled script. The `.quiet = TRUE` argument suppresses all printed
-output while still computing and storing the diagnostic report
-internally.
+The `*_join_spy()` wrappers print diagnostic output by default. In a
+scheduled script, `.quiet = TRUE` suppresses all printed output while
+still computing the report internally.
 
 ``` r
 
@@ -149,7 +121,7 @@ readings <- data.frame(
 result <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 ```
 
-The report is still available after the fact via
+The report is still available via
 [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md):
 
 ``` r
@@ -159,10 +131,8 @@ rpt$match_analysis$match_rate
 #> [1] 0.75
 ```
 
-This separation of execution and inspection is the key pattern. The join
-runs silently inside a pipeline. Later (maybe in a validation step at
-the end of the script, maybe in a separate monitoring job) you pull the
-report and check its contents programmatically:
+The join runs silently; later, we pull the report and check its contents
+programmatically:
 
 ``` r
 
@@ -176,25 +146,13 @@ if (rpt$match_analysis$match_rate < 0.95) {
 #> Warning: Low match rate (75.0%) in sensor join -- check for missing sensor IDs
 ```
 
-This gives you the diagnostic power of
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-without cluttering the standard output of your pipeline. The report
-object persists in memory until the next `*_join_spy()` call overwrites
-it, so there is no race condition as long as your script is
-single-threaded (which R scripts are).
-
-You can build arbitrarily complex validation logic on top of the report
-object. Check the number of issues, inspect specific issue types,
-compare the expected row count against a threshold; whatever your
-pipeline requires. The report is a plain list, so standard R subsetting
-works. Nothing about the validation requires interactive use; it is all
-programmatic.
+The report object is a plain list, so standard R subsetting works for
+arbitrarily complex validation logic.
 
 One caveat:
 [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
-only stores the single most recent report. If your script performs three
-joins in sequence, only the third report survives. If you need to retain
-reports from earlier joins, either log them (see the next section) or
+stores only the most recent report. If a script performs three joins in
+sequence, only the third report survives. To retain earlier reports,
 capture them explicitly:
 
 ``` r
@@ -212,11 +170,9 @@ report2 <- last_report()
 A join that was one-to-one in development can become many-to-many in
 production when upstream data changes.
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-prevents this by enforcing a cardinality constraint. If the constraint
-is violated, the function throws an error instead of silently producing
-a Cartesian product.
+enforces a cardinality constraint and throws an error if it is violated.
 
-The workflow has two phases. In development, you use
+In development, we use
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
 to understand the actual relationship:
 
@@ -239,10 +195,8 @@ detect_cardinality(products, line_items, by = "product_id")
 #> Right duplicates: 2 key(s)
 ```
 
-The result tells you this is a one-to-many relationship: each product
-appears once in `products` but can appear multiple times in
-`line_items`. That is expected because products are a reference table
-and line items are transactional. Now you encode that expectation in
+One-to-many: each product appears once in `products` but can appear
+multiple times in `line_items`. We encode that expectation in
 production:
 
 ``` r
@@ -257,9 +211,8 @@ nrow(result)
 #> [1] 5
 ```
 
-If someone accidentally loads a `products` table with duplicate product
-IDs (turning the relationship into many-to-many), the script fails
-immediately:
+If someone loads a `products` table with duplicate product IDs, the
+script fails immediately:
 
 ``` r
 
@@ -280,62 +233,35 @@ join_strict(
 #>   Left duplicates: 1, Right duplicates: 2
 ```
 
-The four cardinality levels each correspond to a real data pattern:
+The four cardinality levels:
 
-- **1:1** means a lookup table joined to another lookup table. Each key
-  appears exactly once on both sides (country codes to currency codes,
-  employee IDs to badge numbers). If either side has duplicates,
-  something went wrong in the ETL.
+- **1:1** – lookup to lookup. Each key appears exactly once on both
+  sides.
 
-- **1:m** applies when the left table is a reference and the right table
-  has transactions or measurements: products to order line items,
-  customers to support tickets, stations to hourly weather readings.
+- **1:m** – reference on the left, transactions on the right (products
+  to line items, stations to hourly readings).
 
-- **m:1** is the mirror image: the left table has transactions while the
-  right table serves as the lookup. Examples include sales records
-  joined to a region table, or survey responses joined to a demographic
-  codebook.
+- **m:1** – transactions on the left, lookup on the right (sales joined
+  to a region table).
 
-- **m:m** indicates duplicates on both sides. This is almost always a
-  bug. The only legitimate use case is generating all pairwise
-  combinations of two attribute sets, which is rare enough that
-  requiring an explicit `expect = "m:m"` acts as a speed bump.
+- **m:m** – duplicates on both sides. Almost always a bug; requiring an
+  explicit `expect = "m:m"` acts as a speed bump.
 
-In practice, `"1:m"` and `"m:1"` cover the vast majority of production
-joins. Use
+In practice, `"1:m"` and `"m:1"` cover most production joins.
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-once during development to confirm the relationship, then hard-code the
-`expect` value in your production script. The constraint costs almost
-nothing at runtime (it checks for duplicates in the key columns before
-performing the join) yet it catches a class of upstream data quality
-problems that would otherwise propagate silently.
+confirms the relationship during development; the `expect` value is then
+hard-coded in the production script.
 
-Why not just use
 [`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
-instead? The two functions solve different problems.
-[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
-warns about Cartesian product explosion, the situation where a key has
-many duplicates on both sides and the join result grows quadratically.
+solves a different problem: it warns about Cartesian product explosion
+when a key has many duplicates on *both* sides. A join can violate a
+`"1:1"` constraint without triggering a Cartesian explosion (one extra
+duplicate is enough), and a `"m:m"` join can produce a massive product
+that
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-enforces a relationship contract. A join can violate a `"1:1"`
-constraint without triggering a Cartesian explosion (one extra duplicate
-is enough). Conversely, a `"m:m"` join can produce a massive Cartesian
-product that
-[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-would allow because `"m:m"` is the loosest constraint. Use
-[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-when you know the expected relationship. Use
-[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
-as an additional guard when the expected relationship is `"m:m"` and you
-want to bound the expansion factor.
+would allow. The two functions complement each other.
 
 ## Logging and Audit Trails
-
-Production scripts need logs. joinspy provides two mechanisms: manual
-logging with
-[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
-and automatic logging with
-[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md).
 
 ### Manual logging
 
@@ -350,9 +276,9 @@ report <- join_spy(sensors, readings, by = "sensor_id")
 # Text format -- human-readable
 txt_log <- tempfile(fileext = ".log")
 log_report(report, txt_log)
-#> ✔ Report logged to C:/Temp\RtmpKCPMYC\file1d9003e615f06.log
+#> ✔ Report logged to C:/Temp\Rtmp2BnYNR\file31bf43ca12605.log
 cat(readLines(txt_log), sep = "\n")
-#> Logged: 2026-03-31 09:32:44
+#> Logged: 2026-03-31 23:21:09
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -391,7 +317,7 @@ unlink(txt_log)
 # JSON format -- machine-readable
 json_log <- tempfile(fileext = ".json")
 log_report(report, json_log)
-#> ✔ Report logged to C:/Temp\RtmpKCPMYC\file1d90043297cf9.json
+#> ✔ Report logged to C:/Temp\Rtmp2BnYNR\file31bf41787369d.json
 cat(readLines(json_log), sep = "\n")
 #> {
 #>   "by": "sensor_id",
@@ -421,41 +347,30 @@ cat(readLines(json_log), sep = "\n")
 #> },
 #>   "n_issues": 1,
 #>   "issue_types": "near_match",
-#>   "logged_at": "2026-03-31 09:32:44"
+#>   "logged_at": "2026-03-31 23:21:09"
 #> }
 unlink(json_log)
 ```
 
-Text format is useful when humans read the logs directly: tailing a log
-file during a batch run, reviewing output after a nightly job. JSON
-format is useful when the logs feed into a monitoring system, a
-database, or a downstream script that parses them programmatically. Pick
-one based on who or what will consume the log.
-
-You can also save reports as `.rds` files, which preserves the full R
-object including all nested lists and data frames. This is heavier than
-text or JSON but allows you to reload the report later and inspect it
-interactively with [`print()`](https://rdrr.io/r/base/print.html),
-[`summary()`](https://rdrr.io/r/base/summary.html), or direct list
-access. Use `.rds` when you need the complete report for post-mortem
-analysis; use text or JSON when you need a human-readable or
-machine-parseable record.
+Text format works for tailing logs during a batch run; JSON format feeds
+into monitoring systems or downstream scripts. Reports can also be saved
+as `.rds` files, which preserves the full R object for later interactive
+inspection.
 
 ### Automatic logging
 
-For scripts that perform many joins, setting up a log file once at the
-top is cleaner than calling
-[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
-after each join.
+For scripts with many joins,
 [`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
-enables automatic logging: every subsequent `*_join_spy()` call appends
-its report to the specified file.
+at the top is cleaner than calling
+[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
+after each one. Every subsequent `*_join_spy()` call appends its report
+to the file.
 
 ``` r
 
 auto_log <- tempfile(fileext = ".log")
 set_log_file(auto_log, format = "text")
-#> ℹ Automatic logging enabled: C:/Temp\RtmpKCPMYC\file1d90018b05631.log
+#> ℹ Automatic logging enabled: C:/Temp\Rtmp2BnYNR\file31bf429b81d46.log
 
 # These joins are automatically logged
 result1 <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
@@ -464,7 +379,7 @@ result2 <- inner_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 # Check what got logged
 cat(readLines(auto_log), sep = "\n")
 #> 
-#> Logged: 2026-03-31 09:32:44
+#> Logged: 2026-03-31 23:21:09
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -496,7 +411,7 @@ cat(readLines(auto_log), sep = "\n")
 #>   near_match: 1
 #> ============================================================
 #> 
-#> Logged: 2026-03-31 09:32:44
+#> Logged: 2026-03-31 23:21:09
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -534,31 +449,17 @@ set_log_file(NULL)
 unlink(auto_log)
 ```
 
-The pattern for a production script is: set up the log file at the
-start, run all your joins, and disable logging at the end (or let R’s
-session cleanup handle it). The log accumulates a timestamped record of
-every join, including match rates, issue counts, and expected row
-counts. If something goes wrong downstream, you can trace back through
-the log to see which join introduced the problem.
-
-Automatic logging only triggers from `*_join_spy()` wrappers. If you
-call
+Automatic logging only triggers from `*_join_spy()` wrappers.
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-or bare [`merge()`](https://rdrr.io/r/base/merge.html) directly, nothing
-is logged. This is by design: the wrappers are the “instrumented” path,
-and
-[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-is a lightweight guard that does not build a full report. If you want
-both cardinality enforcement and logging, run
+and bare [`merge()`](https://rdrr.io/r/base/merge.html) calls are not
+logged – the wrappers are the instrumented path. To combine cardinality
+enforcement with logging, run
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-as a separate check, then use
-[`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)
-(or whichever wrapper fits) for the actual join. The complete production
-pattern at the end of this vignette demonstrates exactly this approach.
+as a separate check and use a `*_join_spy()` wrapper for the actual
+join.
 
 [`get_log_file()`](https://gillescolling.com/joinspy/reference/get_log_file.md)
-returns the current log path (or `NULL` if logging is disabled), which
-is handy for conditional logic:
+returns the current log path (or `NULL` if logging is disabled):
 
 ``` r
 
@@ -570,10 +471,9 @@ if (!is.null(get_log_file())) {
 
 ## Sampling for Large Datasets
 
-Running full diagnostics on a table with ten million rows takes time.
 The `sample` parameter in
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-runs the analysis on a random subset while the actual join (if you use a
+runs the analysis on a random subset while the actual join (via a
 `*_join_spy()` wrapper) still operates on the full data.
 
 ``` r
@@ -595,46 +495,33 @@ big_customers <- data.frame(
 # Full analysis
 system.time(report_full <- join_spy(big_orders, big_customers, by = "customer_id"))
 #>    user  system elapsed 
-#>    0.14    0.03    0.18
+#>    0.11    0.06    0.18
 
 # Sampled analysis
 system.time(report_sampled <- join_spy(big_orders, big_customers,
                                         by = "customer_id", sample = 5000))
 #>    user  system elapsed 
-#>    0.07    0.02    0.09
+#>    0.09    0.00    0.09
 ```
 
-The sampled report is approximate. Match rates and duplicate counts are
-estimated from the sample rather than computed exactly. For most
-production monitoring, this is fine; you want to know whether the match
-rate is roughly 95% or roughly 60%, not whether it is 94.7% or 95.1%.
-The sample catches systemic problems (wrong key column, widespread
-encoding issues, massive duplicate explosion) with a fraction of the
+The sampled report is approximate – match rates and duplicate counts are
+estimated from the subset. For production monitoring, we typically care
+whether the match rate is roughly 95% or roughly 60%, not whether it is
+94.7% or 95.1%. Sampling catches systemic problems (wrong key column,
+widespread encoding issues, duplicate explosion) with a fraction of the
 runtime.
 
-The tradeoff: sampling can miss rare issues. If 0.1% of your keys have a
-zero-width space, a 5,000-row sample from a 10-million-row table might
-not include any of them. For this reason, run full diagnostics
-periodically (weekly, or whenever the upstream data source changes) and
-use sampled diagnostics for the daily runs. This layered approach gives
-you speed on most executions and thoroughness when it matters.
-
-How large should the sample be? There is no universal answer, but a
-sample of 10,000 to 50,000 rows catches most systemic issues. The goal
-is not statistical significance; it is catching problems that affect a
-meaningful fraction of keys. If your pipeline joins ten tables, sampling
-each one at 10,000 rows keeps the total diagnostic overhead under a
-second even on modest hardware. The diagnostics are always cheaper than
-the join itself, so the sample size rarely needs to be tuned
-aggressively.
+Sampling can miss rare issues. If 0.1% of keys have a zero-width space,
+a 5,000-row sample from a 10-million-row table might not include any.
+Running full diagnostics periodically (weekly, or when the upstream
+source changes) alongside sampled daily runs covers both speed and
+thoroughness.
 
 ## A Complete Production Pattern
 
-The sections above introduced each tool individually. Here they are
-wired together into a single script that represents a realistic
-production workflow. The scenario: a nightly job loads order and
+Here is a realistic production workflow: a nightly job loads order and
 customer data, validates keys, repairs if needed, joins with cardinality
-enforcement, and logs everything for audit.
+enforcement, and logs everything.
 
 ``` r
 
@@ -645,7 +532,7 @@ enforcement, and logs everything for audit.
 # --- Setup logging ---
 pipeline_log <- tempfile(fileext = ".log")
 set_log_file(pipeline_log, format = "text")
-#> ℹ Automatic logging enabled: C:/Temp\RtmpKCPMYC\file1d900356337fa.log
+#> ℹ Automatic logging enabled: C:/Temp\Rtmp2BnYNR\file31bf4120083b.log
 
 # --- Load data (simulated) ---
 orders <- data.frame(
@@ -718,7 +605,7 @@ if (file.exists(pipeline_log)) {
   cat(readLines(pipeline_log), sep = "\n")
 }
 #> 
-#> Logged: 2026-03-31 09:32:44
+#> Logged: 2026-03-31 23:21:10
 #> ------------------------------------------------------------
 #> Join Key: customer_id
 #> 
@@ -756,42 +643,13 @@ set_log_file(NULL)
 unlink(pipeline_log)
 ```
 
-Each gate in this script serves a different purpose. The
+The three gates catch different failure modes:
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-gate catches string-level problems (whitespace, encoding, case) and
-attempts an automatic repair. The
+catches string-level problems and attempts repair,
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-gate checks the relationship between the two tables: orders to customers
-should be many-to-one, and if the customer table suddenly has duplicates
-(a common ETL failure), the script halts before producing a Cartesian
-product. The row count check is a final sanity guard: a left join should
-preserve all rows from the left table, and if it does not, something has
-gone wrong that the other gates did not catch.
-
-The logging runs in the background throughout because
+halts on unexpected many-to-many relationships, and the row count check
+guards against anything the first two gates missed. Logging runs
+throughout because
 [`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
-was called at the top. Every `*_join_spy()` call appends a timestamped
-report to the log file. After the script finishes, the log contains a
-complete record of every join: what was checked, what was found, and
-what the predicted row counts were. This audit trail pays for itself
-when debugging a data quality issue days after the pipeline ran.
-
-The pattern scales. Add more tables, more gates, more joins, and the
-structure stays the same. Set up logging once, assert key quality before
-each join, enforce cardinality where you know the expected relationship,
-and check row counts after. The overhead is minimal:
-[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-and
-[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-are both O(n) in the number of rows, and
-[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
-adds only a duplicate check on top of the join itself. For million-row
-tables, add `sample = 50000` to the
-[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
-calls if the diagnostics become the bottleneck.
-
-The alternative to all of this is trust. Trust that the upstream data is
-clean, trust that the ETL did not introduce duplicates, trust that the
-key columns still match. Trust works until it does not, and when it
-breaks, the cost is always higher than the cost of the checks would have
-been.
+was called at the top. The structure scales – more tables, more gates,
+more joins, same pattern.
