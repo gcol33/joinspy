@@ -108,7 +108,7 @@ join_explain(result, orders, customers, by = "id", type = "left")
 
 The package ships join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) that run diagnostics before joining and attach the report as an attribute. `join_strict()` enforces cardinality (`1:1`, `1:m`, `m:1`, `m:m`) and errors on violation. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences.
 
-Joins auto-detect the input class (tibble, data.table, data.frame) and dispatch to the native join engine. Override with `backend = "dplyr"` or `backend = "data.table"` if needed.
+Joins work with tibbles, data.tables, and plain data frames.
 
 ## Installation
 
