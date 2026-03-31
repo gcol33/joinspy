@@ -23,16 +23,11 @@ joinspy diagnoses join keys before you join. It surfaces the string-level proble
 
 ## String Diagnostics
 
-Most failed joins are not caused by missing data. They fail because the keys
-*look* identical but are not: a trailing space, a case mismatch, an invisible
-Unicode character. These problems are hard to spot by eye and rarely show up in
-`str()` or `summary()`. joinspy was built to catch them.
+Most failed joins are not caused by missing data. They fail because the keys *look* identical but differ at the byte level: a trailing space, a case mismatch, an invisible Unicode character. `str()` and `summary()` won't reveal these.
 
 ### Whitespace
 
-Trailing and leading whitespace is the single most common reason keys fail to
-match. A column exported from Excel or read from a CSV will often contain
-`"London "` alongside `"London"`, and R sees those as two distinct values.
+Trailing and leading whitespace is the most common reason keys fail to match. A column exported from Excel might contain `"London "` alongside `"London"`, and R treats those as distinct values.
 
 ```{r}
 sales <- data.frame(
@@ -50,14 +45,9 @@ cities <- data.frame(
 report <- join_spy(sales, cities, by = "city")
 ```
 
-Once printed, the report flags the whitespace problems and tells you exactly
-which values are affected. The `match_analysis` section shows what the match rate
-would be if those issues were fixed; here, `"Paris "` and `" Berlin"` both
-fail to match their clean counterparts, dropping the match rate from 100% to
-50%.
+The report flags the whitespace problems and shows which values are affected. `"Paris "` and `" Berlin"` both fail to match, dropping the match rate from 100% to 50%.
 
-Whitespace problems compound when keys span multiple columns. Suppose you join
-on both city and district:
+Whitespace problems compound with multi-column keys:
 
 ```{r}
 sales2 <- data.frame(
@@ -77,27 +67,19 @@ districts <- data.frame(
 report <- join_spy(sales2, districts, by = c("city", "district"))
 ```
 
-Now London fails on the district column and Paris fails on the city column.
-Each column is checked independently; a row needs all key columns to match, so
-a single trailing space in any one of them is enough to break the join.
+London fails on the district column, Paris on the city column. A row needs all key columns to match, so a single trailing space in any column breaks the join.
 
-For a quick pass/fail gate in scripts, use `key_check()`:
+For a quick pass/fail gate, we can use `key_check()`:
 
 ```{r}
 key_check(sales, cities, by = "city")
 ```
 
-`key_check()` returns `FALSE` here because of the whitespace. When
-`warn = TRUE` (the default), it also prints which issues it found. This makes
-`key_check()` useful as an assertion in automated pipelines: wrap it in
-`stopifnot()` and the script halts before a broken join silently drops rows.
-Unlike `join_spy()`, which returns a full report object, `key_check()` is
-deliberately minimal (a single logical value) so it slots cleanly into
-conditional logic.
+`key_check()` returns `FALSE` here because of the whitespace, and with `warn = TRUE` (the default) it prints which issues it found. It returns a single logical, so it slots into `stopifnot()` or conditional logic.
 
 ### Case Mismatches
 
-Databases and spreadsheets handle case differently. A CRM might store `"ACME"` while the billing system stores `"Acme"`, and R treats these as distinct strings.
+A CRM might store `"ACME"` while the billing system stores `"Acme"`, and R treats these as distinct strings.
 
 ```{r}
 invoices <- data.frame(
@@ -115,17 +97,11 @@ vendors <- data.frame(
 report <- join_spy(invoices, vendors, by = "company")
 ```
 
-Each case-mismatched pair is listed in the output. Only `"Initech"` matches exactly;
-the other three would be lost in a standard join. Case conflicts are particularly common
-when merging data from systems with different conventions: CRMs that uppercase
-everything, ERPs that title-case, web forms that accept freeform input. The
-`match_analysis` section of the report shows the potential match rate both with
-and without case sensitivity, so you can gauge whether standardizing case would
-recover most of the lost matches.
+Only `"Initech"` matches exactly; the other three would be lost in a standard join. The `match_analysis` section shows the potential match rate both with and without case sensitivity.
 
 ### Encoding and Invisible Characters
 
-Encoding issues are harder to spot than whitespace or case. Two strings render identically in the console but differ at the byte level: a non-breaking space (`\u00A0`) versus a regular space, a Latin-1 accented character versus its UTF-8 equivalent.
+Two strings can render identically in the console but differ at the byte level: a non-breaking space (`\u00A0`) versus a regular space, a zero-width space from PDF copy-paste.
 
 ```{r}
 # Simulate invisible character contamination
@@ -144,18 +120,11 @@ clean_ids <- data.frame(
 report <- join_spy(raw_ids, clean_ids, by = "product_id")
 ```
 
-The zero-width space appended to `"SKU-003"` is invisible when printed but
-prevents the join from matching. joinspy flags this under encoding issues. Other
-common culprits include non-breaking spaces (`\u00A0`), byte-order marks, and
-right-to-left marks that creep in from PDF copy-paste or web scraping. Standard
-R string functions (`trimws()`, `nchar()`) will not catch these because they
-operate on visible characters only. By identifying the specific Unicode
-code points involved, joinspy saves considerable debugging time compared to
-staring at two strings that look identical in the console.
+The zero-width space appended to `"SKU-003"` is invisible when printed but prevents the match. joinspy flags this under encoding issues and identifies the specific Unicode code points involved.
 
 ### Combining Multiple Issues
 
-Real data rarely has just one problem. A single key column might have trailing whitespace on some rows, case mismatches on others, invisible characters on a third set. `join_spy()` checks for all of these in one call and reports them together, grouped by type.
+Real data rarely has just one problem. `join_spy()` checks for whitespace, case, and encoding issues in one call and reports them together, grouped by type.
 
 ```{r}
 employees <- data.frame(
@@ -173,20 +142,11 @@ departments <- data.frame(
 report <- join_spy(employees, departments, by = "dept")
 ```
 
-Zero matches out of four rows. Grouped by problem type (whitespace, case, encoding), the output lets you
-decide how to address each one. This
-matters because the fix differs: whitespace is safe to trim automatically, case
-standardization requires choosing a direction (upper, lower, or title), and
-encoding issues sometimes indicate deeper data pipeline problems that trimming
-alone will not solve. The grouped output lets you prioritize; often fixing
-whitespace and case recovers 90% of lost matches, and the remaining encoding
-problems can be handled case by case.
+Zero matches out of four rows, with the problems grouped by type. The fix differs per category: whitespace is safe to trim automatically, case standardization requires choosing a direction, and encoding issues may indicate deeper pipeline problems.
 
 ### Duplicate Keys
 
-Duplicates do not prevent matches, but they multiply rows. If `"London"`
-appears three times in the left table and twice in the right, you get six rows
-for London after an inner join, often unintentionally.
+Duplicates don't prevent matches, but they multiply rows. If `"London"` appears three times in the left table and twice in the right, we get six rows for London after an inner join.
 
 `key_duplicates()` returns the offending rows along with a count:
 
@@ -201,23 +161,15 @@ transactions <- data.frame(
 key_duplicates(transactions, by = "store_id")
 ```
 
-Use `keep = "first"` or `keep = "last"` to return only the first or last
-occurrence per key. The default `keep = "all"` returns every row that
-participates in a duplicate group. The `.n_duplicates` column in the output
-tells you the group size, which directly maps to the row multiplication factor:
-a key with `.n_duplicates = 3` in the left table and `.n_duplicates = 2` in the
-right will produce 6 rows for that key in an inner join.
+The `keep` argument accepts `"first"`, `"last"`, or the default `"all"`. The `.n_duplicates` column maps directly to the row multiplication factor in a join.
 
 ## Auto-Repair
 
-Once you know what is wrong, joinspy can fix it. `join_repair()` handles
-whitespace trimming, case standardization, invisible character removal, and
-empty-to-NA conversion in a single call.
+`join_repair()` handles whitespace trimming, case standardization, invisible character removal, and empty-to-NA conversion in a single call.
 
 ### Dry Run
 
-Always preview repairs before applying them. The `dry_run = TRUE` option shows
-what would change without modifying the data:
+We can preview what `join_repair()` would change with `dry_run = TRUE`:
 
 ```{r}
 messy_left <- data.frame(
@@ -235,17 +187,11 @@ messy_right <- data.frame(
 join_repair(messy_left, messy_right, by = "id", dry_run = TRUE)
 ```
 
-The dry run tells you how many values will change and in which direction,
-without touching the original data frames. Review this output carefully: it
-shows which values will be modified and what they will become. Review
-carefully for case standardization, where uppercasing a key like
-`"c-303"` to `"C-303"` is correct, but you want to verify that both tables
-agree on the target format before committing.
+The dry run shows how many values will change and what they become, without touching the original data.
 
 ### Applying Repairs
 
-Drop `dry_run` (or set it to `FALSE`) to get back the repaired data frames.
-When you pass both `x` and `y`, the return value is a list with both:
+Drop `dry_run` (or set it to `FALSE`) to get back the repaired data frames. When we pass both `x` and `y`, the return value is a list with both:
 
 ```{r}
 repaired <- join_repair(
@@ -260,47 +206,28 @@ repaired$x$id
 repaired$y$id
 ```
 
-Both sides now have clean, uppercase, whitespace-free keys. You can pass the
-repaired tables straight into a join.
-
-To confirm the repairs worked, run `key_check()` on the repaired tables:
+Both sides now have clean, uppercase, whitespace-free keys. We can confirm with `key_check()`:
 
 ```{r}
 key_check(repaired$x, repaired$y, by = "id")
 ```
 
-This should return `TRUE` with no warnings. Running `key_check()` after repair
-is good practice because it catches edge cases where trimming or case
-standardization was not enough (for instance, if two distinct keys collapse into
-the same value after uppercasing).
-
-One important caveat: `join_repair()` fixes mechanical string problems:
-whitespace, case, invisible characters, empty strings. It does not fix typos,
-semantic mismatches, or fundamentally different key formats. If one table uses
-`"USA"` and the other uses `"United States"`, or one stores product codes as
-`"P-001"` while the other uses `"001"`, repair will not bridge that gap. Those
-require manual recoding or a lookup table.
+`join_repair()` fixes mechanical string problems: whitespace, case, invisible characters, empty strings. It does not fix typos, semantic mismatches, or different key formats (`"USA"` vs. `"United States"`).
 
 ### Repair Suggestions from a Report
 
-If you already have a `JoinReport` from `join_spy()`, call `suggest_repairs()`
-to get ready-to-run R code that fixes the detected issues:
+If we already have a `JoinReport` from `join_spy()`, `suggest_repairs()` generates ready-to-run code that fixes the detected issues:
 
 ```{r}
 report <- join_spy(messy_left, messy_right, by = "id")
 suggest_repairs(report)
 ```
 
-This prints code snippets you can copy into your script. It is deliberately not
-automatic: you should review the suggestions before running them. The generated
-code calls `join_repair()` with the appropriate flags enabled based on what the
-report detected, so you do not have to remember which issues were present.
+The generated code calls `join_repair()` with the appropriate flags based on what the report detected.
 
 ## Row Count Predictions
 
-Every `JoinReport` includes an `expected_rows` component that predicts how many
-rows each join type will produce, calculated from the key overlap and
-duplicate structure, before any join is executed.
+Every `JoinReport` includes an `expected_rows` component that predicts how many rows each join type will produce, calculated from key overlap and duplicate structure.
 
 ```{r}
 orders <- data.frame(
@@ -319,20 +246,9 @@ report <- join_spy(orders, products, by = "product_id")
 report$expected_rows
 ```
 
-The predictions help you anticipate whether a join will shrink, grow, or
-explode your data. A left join here should retain all five order rows (with
-`NA` for the unmatched `"P4"`), while an inner join drops it.
+A left join here retains all five order rows (with `NA` for the unmatched `"P4"`), while an inner join drops it.
 
-How does joinspy compute these numbers? For each join type, it counts the
-overlapping keys between the two tables and multiplies by the number of
-duplicates on each side. A key that appears twice in `x` and three times in `y`
-contributes 2 * 3 = 6 rows to an inner join. Non-matching keys add rows for
-left, right, and full joins according to the usual rules. The calculation is
-exact when all keys are non-NA and no string issues remain; however, NA keys
-deserve caution. R's `merge()` does not match NAs by default (and neither does
-dplyr), so if either table contains NA keys, the predicted row count may
-overestimate the actual result. The report warns you when NAs are present in the
-key columns so you can account for this.
+For each join type, the calculation counts overlapping keys and multiplies by the number of duplicates on each side. A key appearing twice in `x` and three times in `y` contributes 2 * 3 = 6 rows to an inner join. The calculation is exact when all keys are non-NA and no string issues remain. NA keys deserve caution: R's `merge()` and dplyr both skip NAs by default, so the predicted count may overestimate. The report warns when NAs are present.
 
 `summary()` returns the same information as a compact data frame:
 
@@ -342,12 +258,11 @@ summary(report)
 
 ## Post-Join Diagnostics
 
-Sometimes the join has already happened and you need to understand the result.
+Sometimes the join has already happened and we need to understand the result.
 
 ### Explaining Row Count Changes
 
-`join_explain()` takes the result, the two input tables, and the join column,
-then tells you why the row count changed:
+`join_explain()` takes the result, the two input tables, and the join column, then explains why the row count changed:
 
 ```{r}
 tickets <- data.frame(
@@ -366,20 +281,11 @@ result <- merge(tickets, events, by = "event_id")
 join_explain(result, tickets, events, by = "event_id", type = "inner")
 ```
 
-The output breaks down the row count into contributions from matched keys,
-unmatched keys, and duplicate-driven expansion. Specifically, you get: the
-number of keys that matched in both tables; how many rows each matched key
-contributed (accounting for duplicates); which keys from each table had no
-match; and the net effect on row count compared to the left table. This
-decomposition makes it straightforward to answer questions like "why did my
-table grow by 200 rows?", and usually the answer is a handful of keys with
-unexpected duplicates on one side. If you omit `type`, joinspy infers the join
-type from the row counts (though providing it explicitly is more reliable).
+The output decomposes the row count into contributions from matched keys, unmatched keys, and duplicate-driven expansion. Usually when a table grows unexpectedly, the answer is a handful of keys with duplicates on one side.
 
 ### Before/After Comparison
 
-`join_diff()` compares a data frame before and after a join to show which rows
-were added, dropped, or preserved:
+`join_diff()` compares a data frame before and after a join to show which rows were added, dropped, or preserved:
 
 ```{r}
 before <- data.frame(
@@ -398,12 +304,9 @@ after <- merge(before, lookup, by = "id", all = TRUE)
 join_diff(before, after, by = "id")
 ```
 
-Row 1 was dropped (no match in the right table for a non-full join is
-irrelevant here since we used `all = TRUE`; but row 5 was added from the right
-table). This kind of accounting is tedious to do by hand on large data.
+Row 1 was dropped (no match in the right table for a non-full join is irrelevant here since we used `all = TRUE`; but row 5 was added from the right table).
 
-Here is a second example that highlights row addition from duplicates rather
-than new keys:
+Here is a second example that highlights row addition from duplicates rather than new keys:
 
 ```{r}
 before2 <- data.frame(
@@ -422,16 +325,11 @@ after2 <- merge(before2, dup_lookup, by = "id")
 join_diff(before2, after2, by = "id")
 ```
 
-Here the row count grew from three to four because `id = 1` matched two rows
-in the lookup. No new keys were introduced; the growth came entirely from
-duplicate-driven expansion. `join_diff()` distinguishes these two sources of
-row addition (new keys vs. duplicate expansion), which is the key information
-you need when debugging an unexpectedly large result.
+The row count grew from three to four because `id = 1` matched two rows in the lookup. No new keys were introduced; the growth came entirely from duplicate expansion. `join_diff()` distinguishes these two sources of row addition (new keys vs. duplicate expansion).
 
 ## Safe Join Wrappers
 
-The `*_join_spy()` family wraps standard joins with automatic diagnostics. They
-print a report before joining and return the joined data frame:
+The `*_join_spy()` family wraps standard joins with automatic diagnostics. They print a report before joining and return the joined data frame:
 
 ```{r}
 patients <- data.frame(
@@ -450,23 +348,11 @@ result <- left_join_spy(patients, labs, by = "patient_id")
 head(result)
 ```
 
-All four wrappers (`left_join_spy`, `right_join_spy`, `inner_join_spy`,
-`full_join_spy`) share the same interface.
-
-When should you use a wrapper instead of calling `join_spy()` manually? The
-wrappers are convenient for exploratory work and interactive sessions where you
-want diagnostics printed as a side effect without breaking your pipeline. In
-production scripts, you may prefer calling `join_spy()` first, inspecting the
-report programmatically (checking `report$issues` or `report$expected_rows`),
-and only proceeding with the join if the diagnostics pass. The wrappers also
-accept a `backend` parameter (`"base"`, `"dplyr"`, or `"data.table"`) that
-overrides the automatic backend detection; this is useful when you want to force
-a specific join engine regardless of the input class.
+All four wrappers (`left_join_spy`, `right_join_spy`, `inner_join_spy`, `full_join_spy`) share the same interface. The wrappers are convenient for exploratory work; in production, we might prefer calling `join_spy()` first and inspecting the report programmatically before proceeding. The wrappers also accept a `backend` parameter (`"base"`, `"dplyr"`, or `"data.table"`) that overrides automatic backend detection.
 
 ### Quiet Mode and Deferred Reports
 
-In pipelines, printed output is distracting. Use `.quiet = TRUE` to suppress
-the report, then retrieve it afterward with `last_report()`:
+In pipelines, printed output can be distracting. With `.quiet = TRUE`, the report is suppressed and can be retrieved afterward via `last_report()`:
 
 ```{r}
 result <- inner_join_spy(patients, labs, by = "patient_id", .quiet = TRUE)
@@ -476,17 +362,11 @@ rpt <- last_report()
 rpt$match_analysis$match_rate
 ```
 
-`last_report()` always returns the report from the most recent `*_join_spy()`
-call, regardless of which wrapper was used. The report object is stored in an
-internal environment and persists for the duration of the R session, so you can
-inspect it at any point after the join -- even after several more lines of
-pipeline code have executed.
+`last_report()` returns the report from the most recent `*_join_spy()` call and persists for the duration of the R session.
 
 ## Cardinality Enforcement
 
-`join_strict()` performs a join that throws an error if the key relationship
-violates your expectation. This is useful as a guard in production scripts
-where an unexpected many-to-many would multiply rows.
+`join_strict()` performs a join that errors if the key relationship violates a stated expectation. This is a guard against unexpected many-to-many joins that multiply rows.
 
 ```{r}
 sensors <- data.frame(
@@ -516,21 +396,12 @@ readings_dup <- data.frame(
 join_strict(sensors, readings_dup, by = "sensor_id", expect = "1:1")
 ```
 
-The `expect` argument accepts four cardinality levels, each appropriate for
-different scenarios:
+The `expect` argument accepts four cardinality levels:
 
-- `"1:1"`: both sides have unique keys. Use this when merging two reference
-  tables (e.g., a country table with a currency table, both keyed on country
-  code). Any duplicate on either side is an error.
-- `"1:m"`: the left table has unique keys, the right may repeat. This is the
-  classic lookup-table join: a product catalogue (left) joined to a
-  transactions table (right) where each product appears in many transactions.
-- `"m:1"`: the mirror of `"1:m"`. The right table is the lookup; the left
-  table has repeats.
-- `"m:m"`: duplicates are allowed on both sides. This disables the constraint
-  entirely and is rarely what you want; it exists as an explicit opt-in for the
-  rare cases where a Cartesian product per key is intentional (e.g., generating
-  all pairings between two sets of attributes).
+- `"1:1"`: both sides have unique keys. Any duplicate on either side is an error.
+- `"1:m"`: the left table has unique keys, the right may repeat. The classic lookup-table join.
+- `"m:1"`: the mirror of `"1:m"`. The right table is the lookup.
+- `"m:m"`: duplicates allowed on both sides. Rarely what we want; exists as an explicit opt-in for intentional Cartesian products per key.
 
 To detect the actual cardinality without enforcing anything:
 
@@ -538,16 +409,13 @@ To detect the actual cardinality without enforcing anything:
 detect_cardinality(sensors, readings_dup, by = "sensor_id")
 ```
 
-This returns a string like `"1:m"` that you can use programmatically. You might
-use this in a script to select the right `expect` value for `join_strict()`
-dynamically, or to log the cardinality of a join for monitoring purposes.
+This returns a string like `"1:m"` that we can use programmatically, e.g. to select the right `expect` value or to log the cardinality for monitoring.
 
 ## Advanced Features
 
 ### Cartesian Product Detection
 
-When both tables have duplicates on the same key, a join produces the Cartesian
-product of those duplicates. Two keys with 100 rows each? 10,000 rows for that key alone. `check_cartesian()` warns you before this happens:
+When both tables have duplicates on the same key, the join produces the Cartesian product of those duplicates. Two keys with 100 rows each produce 10,000 rows for that key alone. `check_cartesian()` warns before this happens:
 
 ```{r}
 left <- data.frame(
@@ -565,15 +433,11 @@ right <- data.frame(
 check_cartesian(left, right, by = "group")
 ```
 
-The `threshold` argument (default 10) controls how large the expansion factor
-must be before a warning is triggered. Set it lower for interactive work where
-you want early warnings; set it higher in batch scripts where moderate expansion
-is expected and you only want to catch truly pathological cases.
+The `threshold` argument (default 10) controls how large the expansion factor must be before a warning fires.
 
 ### Multi-Table Join Chains
 
-`analyze_join_chain()` runs diagnostics across a sequence of joins. You provide
-a named list of tables and a list of join specifications:
+`analyze_join_chain()` runs diagnostics across a sequence of joins. We provide a named list of tables and a list of join specifications:
 
 ```{r}
 orders <- data.frame(
@@ -603,20 +467,11 @@ analyze_join_chain(
 )
 ```
 
-Each step prints a diagnostic report. The special name `"result"` in the
-second step refers to the output of the previous join, so you can chain as many
-tables as needed. This placeholder is resolved internally: after the first join
-produces an intermediate table, `"result"` is swapped in as the left (or right)
-table for the next step. This means key diagnostics at step two operate on the
-actual intermediate data, not on the original input, which is important because
-the first join may have introduced NAs or changed the key distribution.
+Each step prints a diagnostic report. The special name `"result"` refers to the output of the previous join, so we can chain as many tables as needed. Because `"result"` resolves to the actual intermediate data, key diagnostics at step two account for any NAs or key distribution changes introduced by the first join.
 
 ### Backend Support
 
-All join wrappers and `join_strict()` accept a `backend` argument. By default
-(`backend = NULL`), joinspy detects the backend from the input class: tibbles
-use dplyr, data.tables use data.table, and plain data frames use base R. You
-can override this:
+All join wrappers and `join_strict()` accept a `backend` argument. By default (`backend = NULL`), joinspy detects the backend from the input class: tibbles use dplyr, data.tables use data.table, plain data frames use base R.
 
 ```{r eval = FALSE}
 # Force dplyr backend even for plain data frames
@@ -626,10 +481,7 @@ left_join_spy(x, y, by = "id", backend = "dplyr")
 left_join_spy(x, y, by = "id", backend = "base")
 ```
 
-The three backends are `"base"`, `"dplyr"`, and `"data.table"`. The diagnostic
-layer is backend-agnostic; all string analysis and key checking happens before
-the join engine is invoked, so the reports are identical regardless of which
-backend performs the actual merge.
+The diagnostic layer is backend-agnostic; all string analysis and key checking happens before the join engine is invoked, so reports are identical regardless of backend.
 
 ## Quick Reference
 

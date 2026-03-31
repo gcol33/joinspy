@@ -27,3 +27,4 @@
 ^TEST_SUMMARY\.md$
 ^[Nn][Uu][Ll]$
 ^\.covrignore$
+^cookies\.txt$

@@ -25,30 +25,21 @@ dispatch to the right engine automatically. The diagnostic layer (`join_spy()`,
 `key_check()`, `join_explain()`, and friends) is backend-agnostic: it runs
 the same analysis regardless of what class the inputs are.
 
-This vignette explains how detection works, when to override it, and what
-happens to the output class through the diagnostic-repair-join cycle.
+We walk through detection, explicit overrides, and class preservation below.
 
 
 ## Auto-detection
 
-When you call `left_join_spy()` or `join_strict()` without specifying a
+When we call `left_join_spy()` or `join_strict()` without specifying a
 backend, joinspy inspects the class of `x` and `y` and picks the backend
-according to a fixed priority:
+according to a fixed priority: data.table > tibble > base R.
 
-1. If either input inherits from `data.table`, use data.table; if either inherits from `tbl_df` (tibble), use dplyr; otherwise fall back to base R `merge()`.
-
-data.table wins over tibble because data.table's merge implementation has
-specific expectations about key handling and indexing that cannot be replicated
-through dplyr's join functions. A data.table joined via dplyr loses its keys,
-its index, and its reference semantics, all properties that the caller likely
-depends on if they chose data.table in the first place. dplyr, by contrast,
-handles a data.table coerced to a tibble without issues. So when the two
-classes conflict, data.table is the safer default. When both inputs are plain
-data frames, base R is the only dependency-free option and is always available.
-
-The detection examines both inputs, not just `x`. Pipelines sometimes pass a tibble on one side and a plain data frame on the other (for instance, reading one table from a CSV with `read.csv()` and another with `readr::read_csv()`). As long as one side is a tibble, dplyr is selected, which avoids the subtle differences in column ordering and NA handling between `merge()` and `dplyr::left_join()`.
-
-What happens when a mixed-class call selects a backend whose package is not installed? joinspy falls back to base R and emits a warning. The most common trigger is a data.table object lingering in an environment where the data.table package was loaded transiently (e.g., via another package) but is no longer available. The warning is loud on purpose: a silent fallback could change the result's class and break downstream code.
+data.table takes priority because its merge implementation depends on key
+handling, indexing, and reference semantics that a dplyr join would discard.
+dplyr, on the other hand, handles a coerced data.table without issues. Both
+inputs are checked -- if one side is a tibble and the other a plain data frame,
+dplyr is selected. If a mixed-class call selects a backend whose package is
+not installed, joinspy falls back to base R with a warning.
 
 Here is the detection in action with each input type:
 
@@ -117,11 +108,7 @@ All join wrappers and `join_strict()` accept a `backend` argument that
 overrides auto-detection. The three valid values are `"base"`, `"dplyr"`, and
 `"data.table"`.
 
-When would you use this? A few common scenarios:
-
-**Forcing dplyr on plain data frames.** If you want tibble output (with its
-stricter printing and no partial matching) but your inputs are plain data
-frames, pass `backend = "dplyr"`:
+We can force dplyr on plain data frames to get tibble output:
 
 ```{r eval = requireNamespace("dplyr", quietly = TRUE)}
 result <- left_join_spy(orders_df, customers_df, by = "id",
@@ -129,11 +116,8 @@ result <- left_join_spy(orders_df, customers_df, by = "id",
 class(result)
 ```
 
-**Forcing base R to avoid dplyr warnings.** dplyr 1.1.0 introduced a
-many-to-many warning for joins that produce Cartesian products. If you have
-already diagnosed the cardinality with `detect_cardinality()` or
-`check_cartesian()` and know the expansion is intentional, you can bypass the
-dplyr warning by forcing `backend = "base"`:
+Or force base R to sidestep dplyr's many-to-many warning when we already know
+the expansion is intentional:
 
 ```{r eval = requireNamespace("dplyr", quietly = TRUE)}
 # These have a legitimate many-to-many relationship
@@ -153,10 +137,7 @@ result <- left_join_spy(tags, prices, by = "item_id",
 nrow(result)
 ```
 
-**Forcing data.table for speed on large data.** If you have plain data frames
-with millions of rows, the data.table merge engine is substantially faster
-than base R or dplyr. Passing `backend = "data.table"` triggers the conversion
-internally; the result comes back as a data.table.
+Or force data.table on plain data frames for speed on large inputs:
 
 ```{r eval = requireNamespace("data.table", quietly = TRUE)}
 result <- left_join_spy(orders_df, customers_df, by = "id",
@@ -164,34 +145,23 @@ result <- left_join_spy(orders_df, customers_df, by = "id",
 class(result)
 ```
 
-Note that the explicit backend must be installed. Requesting
-`backend = "dplyr"` when dplyr is not installed will error, not silently fall
-back. This is intentional: an explicit choice should fail loudly if it cannot
-be honored. The asymmetry with auto-detection (which does fall back silently)
-is deliberate. Auto-detection is a convenience; an explicit override is a
-contract.
+An explicit backend must be installed. Requesting `backend = "dplyr"` without
+dplyr will error, not silently fall back -- auto-detection is a convenience,
+but an explicit override is a contract.
 
-One more use case worth mentioning: **reproducibility across environments.**
-If your script must produce identical output on a colleague's machine that may
-or may not have dplyr installed, set `backend = "base"` explicitly. This
-removes the class of the input as a variable and guarantees that the join
-always uses `merge()`, regardless of whether someone upstream happened to
-return a tibble or a plain data frame.
+Setting `backend = "base"` is also a way to guarantee reproducibility across
+environments where dplyr may or may not be installed.
 
 
 ## Class preservation
 
-joinspy preserves input class through the full diagnostic-repair-join cycle.
-The three stages behave as follows:
+joinspy preserves input class through the full diagnostic-repair-join cycle:
 
-- **Diagnostics** (`join_spy()`, `key_check()`, `join_explain()`, etc.)
-  accept any data frame subclass and return report objects. They do not
-  modify or convert the input data.
-- **Repair** (`join_repair()`) operates on the key columns in place and
-  returns the same class it received.
-- **Join wrappers** (`left_join_spy()`, `join_strict()`, etc.) dispatch to
-  the native join engine for the detected class, so the result matches the
-  input class.
+- **Diagnostics** (`join_spy()`, `key_check()`, etc.) accept any data frame
+  subclass and return report objects without modifying the input.
+- **Repair** (`join_repair()`) operates on key columns in place and returns
+  the same class it received.
+- **Join wrappers** dispatch to the native join engine for the detected class.
 
 Here is a full cycle with base R data frames:
 
@@ -263,35 +233,27 @@ class(joined_dt)  # still data.table
 joined_dt
 ```
 
-One edge case to be aware of: when you use `join_repair()` with both `x` and
-`y` arguments, it returns a list with `$x` and `$y`. Each element preserves
-the class of the corresponding input. If `x` is a tibble and `y` is a plain
-data frame, you get a tibble in `$x` and a data frame in `$y`.
+When `join_repair()` receives both `x` and `y`, it returns a list with `$x`
+and `$y`, each preserving the class of the corresponding input.
 
-Class preservation also extends to `join_strict()`. The cardinality check
-happens before the join, so if the constraint is satisfied the result has the
-same class as the inputs, and if the constraint is violated no result is
-returned at all (the function errors). There is no intermediate state where
-the class might be lost.
+`join_strict()` also preserves class -- the cardinality check runs before the
+join, so a satisfied constraint returns the native class and a violated one
+errors before any output is produced.
 
-The one place where class can change is when you use an explicit backend
-override that does not match the input class. Passing `backend = "data.table"`
-on a tibble will return a data.table, because the data.table merge engine
-produces data.table output. Since you asked for the data.table engine, that is what you get. Pass `backend = "dplyr"` instead if you need a tibble back.
+The one exception is an explicit backend override that does not match the input
+class. Passing `backend = "data.table"` on a tibble returns a data.table,
+because that is what the data.table engine produces.
 
 
 ## Diagnostics are backend-agnostic
 
 The diagnostic functions (`join_spy()`, `key_check()`, `key_duplicates()`,
 `join_explain()`, `detect_cardinality()`, `check_cartesian()`) operate purely
-on column values. They do not call any join engine. This means they produce
-identical results whether the input is a data frame, tibble, or data.table.
+on column values and never call a join engine. They produce identical results
+regardless of input class.
 
-This separation is useful in practice. You can diagnose with `join_spy()` on
-a data.table, then join with dplyr if you prefer its output format. Or
-diagnose in a script where only base R is available, then pass the data to a
-Shiny app that uses dplyr internally. The diagnostic report does not carry any
-backend dependency.
+This means we can diagnose on data.tables and join with dplyr, or diagnose in
+a base-R script and pass the data to a Shiny app that uses dplyr internally.
 
 ```{r eval = requireNamespace("data.table", quietly = TRUE) && requireNamespace("dplyr", quietly = TRUE)}
 # Diagnose on data.tables
@@ -314,64 +276,25 @@ result <- left_join_spy(orders_tbl, customers_tbl, by = "id", .quiet = TRUE)
 class(result)
 ```
 
-The report from `join_spy()` is the same object regardless of input class. Its
-`$issues`, `$expected_rows`, and `$match_analysis` fields contain the same
-values; only the join execution step (called separately via the wrappers)
-depends on the backend. This also means you can write unit tests for your key
-quality using plain data frames even if your production code uses data.table.
-The diagnostic output is structurally identical, so assertions on
-`report$issues` or `report$match_analysis$match_rate` will hold regardless of
-the class used at test time versus production time. You avoid pulling in heavy
-Suggests dependencies just to test key diagnostics.
+The report object is structurally identical across backends -- `$issues`,
+`$expected_rows`, and `$match_analysis` contain the same values. This also
+means we can write unit tests for key quality using plain data frames even when
+production code uses data.table.
 
 
-## Which backend to choose
+## Backend differences at a glance
 
-joinspy does not have a preferred backend. It respects whatever you are
-already using. Here is a brief orientation for cases where you do need to
-choose.
+The three backends differ in a few ways worth noting:
 
-**Base R** has no dependencies and is always available. It uses `merge()`,
-which handles all four join types and named `by` vectors for different column
-names. The output is always a plain data frame. Row order is not guaranteed
-(it depends on the key sort), and `merge()` reorders columns to put the key
-first. For small to medium datasets (up to a few hundred thousand rows), base
-R is perfectly adequate.
+- **Column name collisions.** Base R and dplyr append `.x`/`.y` suffixes;
+  data.table appends `i.` to right-table columns.
+- **Row ordering.** Base R sorts by key; dplyr preserves left-table order;
+  data.table sorts by key if keyed, otherwise preserves insertion order.
+- **Performance.** data.table is the fastest for large inputs. Base R and dplyr
+  are comparable for small to medium datasets.
 
-**dplyr** is the standard in tidyverse workflows. It preserves column order
-and row order from the left table, returns tibbles, and prints compactly. It
-requires the dplyr package (and transitively tibble and several others). Since
-dplyr 1.1.0, it also warns about many-to-many joins, which is helpful as a
-safety net but can be noisy if you have already diagnosed the cardinality with
-joinspy.
-
-**data.table** is the fastest option for large datasets. Its merge
-implementation is heavily optimized and can handle tens of millions of rows
-efficiently. The tradeoff is reference semantics: data.table modifies objects
-in place in some operations, which can surprise users accustomed to R's
-copy-on-modify behavior. joinspy's data.table backend uses `merge()` (not the
-`[.data.table` join syntax), so it avoids most reference-semantic surprises,
-but the result is still a data.table object with data.table's printing and
-subsetting behavior.
-
-A practical consideration: the three backends differ in how they handle column
-name collisions. When `x` and `y` share non-key column names, base R appends
-`.x` and `.y` suffixes, dplyr appends `.x` and `.y` by default (configurable
-via `suffix`), and data.table appends `i.` to the columns from the right table.
-These suffixes affect downstream code that references the merged columns by
-name. If you switch backends mid-project, check that column references still
-resolve correctly.
-
-Another difference is row ordering. Base R's `merge()` sorts rows by the key
-column. dplyr preserves the row order of the left table. data.table sorts by
-key if the tables are keyed, and otherwise preserves insertion order. For most
-analytical workflows the order does not matter, but if you are comparing output
-across backends in tests or reproducibility checks, sort the result before
-comparing.
-
-The simplest rule: use what your project already depends on. If you have no
-preference, base R is the safest default. If performance matters, data.table.
-If you want tibble output and tidyverse compatibility, dplyr.
+If we switch backends mid-project, it is worth checking that column references
+and row-order assumptions still hold.
 
 
 ## See Also
