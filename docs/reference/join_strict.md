@@ -13,6 +13,7 @@ join_strict(
   by,
   type = c("left", "right", "inner", "full"),
   expect = c("1:1", "1:m", "1:many", "m:1", "many:1", "m:m", "many:many"),
+  backend = NULL,
   ...
 )
 ```
@@ -57,6 +58,13 @@ join_strict(
   "m:m" or "many:many"
 
   :   No cardinality constraints (allows all relationships)
+
+- backend:
+
+  Character or `NULL`. The join backend to use. If `NULL` (default),
+  auto-detects from input class. See
+  [`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)
+  for details.
 
 - ...:
 

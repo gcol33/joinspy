@@ -22,7 +22,7 @@ is violated. Use this to catch unexpected many-to-many relationships early."></h
 
     <a class="navbar-brand me-2" href="../index.html">joinspy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,7 +35,10 @@ is violated. Use this to catch unexpected many-to-many relationships early."></h
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/quickstart.html">Quick Start</a></li>
+    <li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="../articles/common-issues.html">Common Join Problems</a></li>
+    <li><a class="dropdown-item" href="../articles/production.html">Joins in Production</a></li>
+    <li><a class="dropdown-item" href="../articles/backends.html">Working with Backends</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -73,6 +76,7 @@ is violated. Use this to catch unexpected many-to-many relationships early.</p>
 <span>  <span class="va">by</span>,</span>
 <span>  type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"left"</span>, <span class="st">"right"</span>, <span class="st">"inner"</span>, <span class="st">"full"</span><span class="op">)</span>,</span>
 <span>  expect <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"1:1"</span>, <span class="st">"1:m"</span>, <span class="st">"1:many"</span>, <span class="st">"m:1"</span>, <span class="st">"many:1"</span>, <span class="st">"m:m"</span>, <span class="st">"many:many"</span><span class="op">)</span>,</span>
+<span>  backend <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -115,6 +119,11 @@ but each key in x matches at most one key in y</p></dd>
 
 
 </dl></dd>
+
+
+<dt id="arg-backend">backend<a class="anchor" aria-label="anchor" href="#arg-backend"></a></dt>
+<dd><p>Character or <code>NULL</code>. The join backend to use. If <code>NULL</code>
+(default), auto-detects from input class. See <code><a href="left_join_spy.html">left_join_spy()</a></code> for details.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

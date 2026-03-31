@@ -1,0 +1,585 @@
+# Why Your Keys Don't Match
+
+You write a join. It runs without error. You check the row count and
+something is off: rows vanished, or they multiplied. The columns look
+fine. The key values look identical when you print them. You stare at
+[`str()`](https://rdrr.io/r/utils/str.html) output for ten minutes and
+learn nothing useful.
+
+The problem is almost never your join logic. It is the strings.
+
+R’s [`merge()`](https://rdrr.io/r/base/merge.html) and dplyr’s
+`*_join()` functions do exactly what you ask: they compare key values
+byte-for-byte and link rows that are equal. When keys fail to match, the
+join did not make a mistake. The keys are genuinely different. The
+difficulty is that the difference is often invisible: a trailing space,
+a case mismatch, a zero-width Unicode character that has no visual
+representation.
+
+This vignette walks through five scenarios where joins fail for
+string-level reasons that resist casual inspection. Each one comes from
+a real-world pattern; the data here is synthetic, but the pain is
+authentic. The goal is not to catalogue every possible string problem
+(the `common-issues` vignette does that), but to show what the
+diagnosis-to-fix workflow looks like in practice.
+
+## Scenario 1: The Excel Export
+
+A small retail analytics team receives monthly sales data from a
+distribution partner. The partner maintains an Excel workbook; every
+month they export a CSV and email it over. The team joins it against
+their internal customer database using a shared `customer_id` column.
+
+For two quarters, everything works. The pipeline runs, the row counts
+check out, and nobody thinks twice about the join. Then one month, 30%
+of the sales records stop matching. Nobody changed the join code. Nobody
+changed the customer database. The partner swears the IDs are correct
+(and they are, in the sense that every ID in the CSV exists in the
+customer database). Eyeballing the CSV confirms that the values look
+right.
+
+The analyst opens R, loads both tables, and tries
+[`merge()`](https://rdrr.io/r/base/merge.html). The result has fewer
+rows than expected. She runs
+[`setdiff()`](https://rdrr.io/r/base/sets.html) on the key columns and
+sees IDs like `"CUST-1002 "` in the partner data that do not appear in
+the internal database. Visually, that looks identical to `"CUST-1002"`.
+The trailing space is there, but the console does not render it
+distinctly.
+
+Here is what the data looks like:
+
+``` r
+
+partner_sales <- data.frame(
+  customer_id = c("CUST-1001", "CUST-1002 ", "CUST-1003",
+                  " CUST-1004", "CUST-1005 ", "CUST-1006"),
+  amount = c(2500, 1800, 3200, 950, 4100, 1600),
+  stringsAsFactors = FALSE
+)
+
+internal_db <- data.frame(
+  customer_id = c("CUST-1001", "CUST-1002", "CUST-1003",
+                  "CUST-1004", "CUST-1005", "CUST-1006", "CUST-1007"),
+  region = c("West", "East", "West", "South", "East", "North", "West"),
+  stringsAsFactors = FALSE
+)
+```
+
+Nothing in [`str()`](https://rdrr.io/r/utils/str.html) reveals the
+issue. Printing the data frame will not show it either, because trailing
+spaces are invisible in console output. But
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+catches it immediately:
+
+``` r
+
+report <- join_spy(partner_sales, internal_db, by = "customer_id")
+```
+
+Three of the six partner IDs carry whitespace (a leading space, trailing
+spaces, or both). These are distinct character values as far as R is
+concerned; `"CUST-1002 "` will never match `"CUST-1002"`.
+
+The fix is one call.
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+trims whitespace from both tables at once:
+
+``` r
+
+repaired <- join_repair(partner_sales, internal_db, by = "customer_id")
+#> ✔ Repaired 3 value(s)
+partner_fixed <- repaired$x
+internal_fixed <- repaired$y
+```
+
+We can verify the repair worked:
+
+``` r
+
+key_check(partner_fixed, internal_fixed, by = "customer_id")
+#> ✔ Key check passed: no issues detected
+```
+
+And now the join gives us what we expected:
+
+``` r
+
+result <- merge(partner_fixed, internal_fixed, by = "customer_id")
+nrow(result)
+#> [1] 6
+```
+
+All six partner sales matched. The root cause turned out to be a formula
+in the partner’s Excel sheet that concatenated values from two columns;
+one of those columns had variable-width entries padded with spaces, and
+the `CONCATENATE` formula preserved every byte. Nobody noticed because
+Excel renders `"CUST-1002"` and `"CUST-1002 "` in exactly the same way.
+The cell just shows the text, and trailing whitespace is invisible in a
+proportional font.
+
+This is the single most common join failure we have seen. It accounts
+for more broken pipelines than all other string issues combined, and it
+is the easiest to fix once you know it is there.
+
+## Scenario 2: Two Databases, Two Conventions
+
+Two data sources at a mid-sized SaaS company need to be connected for a
+churn analysis. The CRM stores email addresses in uppercase (a decision
+from a database migration in the late 1990s that nobody revisited). The
+web app’s event log stores them in lowercase, because that is what
+browsers submit. Both systems have been running independently for years;
+the team wants to join CRM profiles to clickstream events to see which
+subscription plans correlate with engagement.
+
+``` r
+
+crm_profiles <- data.frame(
+  email = c("ALICE@ACME.COM", "BOB@ACME.COM", "CAROL@ACME.COM",
+            "DAVE@ACME.COM", "EVE@ACME.COM"),
+  plan = c("enterprise", "starter", "pro", "enterprise", "starter"),
+  stringsAsFactors = FALSE
+)
+
+click_events <- data.frame(
+  email = c("alice@acme.com", "bob@acme.com", "carol@acme.com",
+            "dave@acme.com", "frank@acme.com"),
+  page_views = c(47, 12, 89, 33, 5),
+  stringsAsFactors = FALSE
+)
+```
+
+The team writes a simple inner join and gets zero rows back. Zero. Not
+“fewer than expected”: literally nothing. At first they suspect the data
+did not load correctly, but both tables have the right number of rows
+and the columns are there. The problem is simpler and more frustrating:
+R’s string comparison is case-sensitive, and `"ALICE@ACME.COM"` does not
+equal `"alice@acme.com"`. Every single key pair fails to match, even
+though the underlying email addresses are obviously the same.
+
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+flags the situation before the join even happens:
+
+``` r
+
+report <- join_spy(crm_profiles, click_events, by = "email")
+```
+
+The case mismatch issue appears in the report.
+[`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
+can generate the specific code to fix it:
+
+``` r
+
+suggest_repairs(report)
+#> 
+#> ── Suggested Repairs ───────────────────────────────────────────────────────────
+#> # Standardize case:
+#> x$email <- tolower(x$email)
+#> y$email <- tolower(y$email)
+```
+
+Or we can use
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+directly, specifying case standardization:
+
+``` r
+
+repaired <- join_repair(
+  crm_profiles, click_events,
+  by = "email",
+  standardize_case = "lower"
+)
+#> ✔ Repaired 5 value(s)
+```
+
+After lowercasing both sides, the inner join returns four matched rows
+(everyone except Eve, who has no click data, and Frank, who is not in
+the CRM):
+
+``` r
+
+result <- merge(repaired$x, repaired$y, by = "email")
+nrow(result)
+#> [1] 4
+result
+#>            email       plan page_views
+#> 1 alice@acme.com enterprise         47
+#> 2   bob@acme.com    starter         12
+#> 3 carol@acme.com        pro         89
+#> 4  dave@acme.com enterprise         33
+```
+
+The interesting thing about this scenario is that neither data source is
+“wrong.” Both are internally consistent; the problem exists only at the
+boundary between them. This is the most common shape of join failures in
+organizational data work: each system is correct in isolation,
+maintained by a different team, documented in its own way. The
+incompatibility only surfaces when someone tries to connect them, and
+the person doing the connecting is usually not the person who chose the
+casing convention in either system.
+
+Note that email addresses are case-insensitive by RFC 5321 (the local
+part before the @ technically can be case-sensitive, but almost no mail
+server enforces this in practice). Lowercasing is the right
+normalization here. For other types of identifiers (product codes,
+country abbreviations, ticker symbols) you may want `"upper"` instead.
+The point is to pick one convention and apply it to both sides before
+joining.
+
+## Scenario 3: The PDF Copy-Paste
+
+A public health researcher is compiling data from multiple sources for a
+systematic review. Most of the data comes from structured databases, but
+a handful of studies published their supplementary tables only as PDF.
+The researcher needs prevalence estimates from those PDFs, so she
+selects the table in the PDF viewer, copies it, pastes it into a
+spreadsheet, cleans up the columns, exports to CSV, and reads it into R.
+
+The data looks perfect. Every country name is spelled correctly when she
+prints the data frame. The columns have the right types. But when she
+joins against a reference table of population data, half the countries
+fail to match. She checks for typos manually; there are none. She runs
+[`unique()`](https://rdrr.io/r/base/unique.html) on both country columns
+and compares them by eye; they look identical.
+
+``` r
+
+# Simulating PDF copy-paste artifacts:
+# \u00A0 is non-breaking space, \u200B is zero-width space
+pdf_data <- data.frame(
+  country = c("Brazil", "India\u200B", "Germany",
+              "Japan\u00A0", "Canada", "France\u200B"),
+  prevalence = c(12.3, 8.7, 5.1, 3.9, 6.2, 4.8),
+  stringsAsFactors = FALSE
+)
+
+reference <- data.frame(
+  country = c("Brazil", "India", "Germany", "Japan",
+              "Canada", "France", "Italy"),
+  population_m = c(214, 1408, 84, 125, 38, 68, 59),
+  stringsAsFactors = FALSE
+)
+```
+
+Watch what happens when we print the PDF data:
+
+``` r
+
+pdf_data$country
+#> [1] "Brazil"  "India​"   "Germany" "Japan "  "Canada"  "France​"
+```
+
+Those country names look perfectly clean. The zero-width space after
+“India” and “France” is literally invisible; it occupies zero pixels of
+width. The non-breaking space after “Japan” renders identically to a
+regular space (which [`trimws()`](https://rdrr.io/r/base/trimws.html)
+would catch), but it is Unicode character U+00A0, not U+0020. A plain
+[`trimws()`](https://rdrr.io/r/base/trimws.html) call will not remove it
+in all R versions.
+
+The merge confirms the damage:
+
+``` r
+
+nrow(merge(pdf_data, reference, by = "country"))
+#> [1] 3
+```
+
+Only three of six countries match. The researcher might spend an hour
+checking for typos that do not exist, because the characters causing the
+failure are invisible to the human eye.
+
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+detects encoding issues that string inspection cannot:
+
+``` r
+
+report <- join_spy(pdf_data, reference, by = "country")
+```
+
+The report flags invisible characters in the left table. Repair is
+straightforward:
+
+``` r
+
+repaired <- join_repair(pdf_data, reference, by = "country")
+#> ✔ Repaired 3 value(s)
+nrow(merge(repaired$x, repaired$y, by = "country"))
+#> [1] 6
+```
+
+Six matches, as expected. The zero-width spaces and non-breaking spaces
+are gone.
+
+This class of problem is hard to catch. Every standard debugging tool
+([`print()`](https://rdrr.io/r/base/print.html),
+[`str()`](https://rdrr.io/r/utils/str.html),
+[`summary()`](https://rdrr.io/r/base/summary.html),
+[`unique()`](https://rdrr.io/r/base/unique.html), even visual comparison
+in a spreadsheet) will show you data that looks correct. You can copy
+the value from the console, paste it into a string comparison, and it
+will fail, and you will not understand why. The characters are there in
+the byte representation; they simply have no visible glyph. PDF
+copy-paste is the most common source, but web scraping, OCR output, and
+data from legacy mainframe systems can produce the same artifacts.
+
+One useful debugging trick outside of joinspy: if you suspect invisible
+characters, run [`nchar()`](https://rdrr.io/r/base/nchar.html) on the
+values. `"India\u200B"` has 6 characters, not 5. But that requires you
+to already suspect the problem exists.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+flags it proactively, before you have spent an hour staring at
+identical-looking strings.
+
+## Scenario 4: The Slowly Growing Mismatch
+
+Consider a monthly ETL pipeline that has been stable for over a year at
+an e-commerce company. Transaction records from the point-of-sale system
+are joined to a product catalogue to attach product names, categories,
+and profit margins. Finance uses the output for monthly reporting. The
+pipeline ran cleanly for months. Then the match rate started drifting
+downward: 99% in January, 97% in February, 94% in March. The pipeline
+did not fail; it just returned slightly fewer rows each month. Nobody
+noticed until April, when finance flagged a discrepancy in the margin
+totals.
+
+The code had not changed. The product catalogue had not changed. What
+changed was a person. A new data entry clerk joined the warehouse team
+in December. The existing convention for product codes was strict:
+`"WDG-100"`, `"WDG-101"`, uppercase prefix, dash, three-digit numeric
+suffix. The new clerk sometimes omitted the dash, sometimes typed in
+lowercase, sometimes both. The codes were close enough that the
+warehouse system accepted them (it did fuzzy matching internally), but
+the join in the ETL pipeline did not.
+
+``` r
+
+# Product catalogue (canonical format)
+catalogue <- data.frame(
+  product_code = c("WDG-100", "WDG-101", "WDG-102",
+                   "WDG-103", "WDG-104", "WDG-105"),
+  product_name = c("Widget A", "Widget B", "Widget C",
+                   "Widget D", "Widget E", "Widget F"),
+  margin = c(0.35, 0.28, 0.42, 0.31, 0.39, 0.25),
+  stringsAsFactors = FALSE
+)
+
+# Recent transactions (mix of old and new clerk entries)
+transactions <- data.frame(
+  product_code = c("WDG-100", "WDG-101", "WDG102",
+                   "wdg-103", "WDG-104", "wdg105",
+                   "WDG-100", "WDG103"),
+  quantity = c(5, 3, 7, 2, 4, 6, 1, 8),
+  stringsAsFactors = FALSE
+)
+```
+
+Some of these will match; some will not. The damage is partial, which
+makes it harder to notice than a complete failure.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+shows the picture:
+
+``` r
+
+report <- join_spy(transactions, catalogue, by = "product_code")
+```
+
+The report flags both case mismatches and unmatched keys. But here is
+where this scenario differs from the previous ones:
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+can fix the case issue, but it cannot fix the missing dashes. Whitespace
+trimming and case standardization are mechanical transformations;
+inserting a dash into `"WDG102"` to make it match `"WDG-102"` requires
+knowledge of the formatting rule, which the tool does not have.
+
+We can do a dry run to see what
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+would fix:
+
+``` r
+
+join_repair(transactions, catalogue,
+            by = "product_code",
+            standardize_case = "upper",
+            dry_run = TRUE)
+#> 
+#> ── Repair Preview (Dry Run) ────────────────────────────────────────────────────
+#> 
+#> ── Left table (x) ──
+#> 
+#> ℹ product_code: upper case (2)
+```
+
+After applying the mechanical fixes:
+
+``` r
+
+repaired <- join_repair(transactions, catalogue,
+                        by = "product_code",
+                        standardize_case = "upper")
+#> ✔ Repaired 2 value(s)
+```
+
+The case issues are resolved, but the dash-versus-no-dash mismatches
+remain. Those require a manual transformation:
+
+``` r
+
+# Manual fix: insert dash if missing in product codes matching the pattern
+fix_codes <- function(codes) {
+  gsub("^([A-Z]{3})(\\d)", "\\1-\\2", codes)
+}
+repaired$x$product_code <- fix_codes(repaired$x$product_code)
+```
+
+Now we can verify:
+
+``` r
+
+result <- merge(repaired$x, repaired$y, by = "product_code")
+nrow(result)
+#> [1] 8
+```
+
+All eight transactions match. This scenario is worth sitting with for a
+moment, because it illustrates a boundary in what automated repair can
+do.
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+handles mechanical transformations: trimming whitespace, normalizing
+case, stripping invisible characters. These are context-free operations
+that are always safe to apply. But inserting a dash into `"WDG102"` to
+produce `"WDG-102"` requires knowing that the canonical format uses a
+dash after three letters. That is domain knowledge.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+will show you that keys are unmatched and flag near-matches, but the fix
+has to come from someone who understands the data.
+
+In practice, the right response to this kind of drift is not just a
+regex in the pipeline; it is a conversation with the warehouse team
+about enforcing the code format at the point of entry. The pipeline fix
+is a bandage; the process fix is the cure.
+
+## Scenario 5: The Compound Key Trap
+
+This one is subtle. Two government datasets need to be linked for a
+policy briefing: regional economic indicators and regional population
+estimates. Both tables are keyed on region and year, a compound key with
+two columns. The year column is numeric, so it matches without trouble.
+The region column is character, and it has a problem that affects only
+some of the records.
+
+``` r
+
+economics <- data.frame(
+  region = c("North America", "Europe", "Asia Pacific ",
+             "North America", "Europe", "Asia Pacific "),
+  year = c(2022, 2022, 2022, 2023, 2023, 2023),
+  gdp_growth = c(2.1, 1.8, 4.2, 1.9, 0.9, 3.8),
+  stringsAsFactors = FALSE
+)
+
+population <- data.frame(
+  region = c("North America", "Europe", "Asia Pacific",
+             "North America", "Europe", "Asia Pacific"),
+  year = c(2022, 2022, 2022, 2023, 2023, 2023),
+  pop_millions = c(580, 450, 4300, 585, 448, 4350),
+  stringsAsFactors = FALSE
+)
+```
+
+In a compound key join, both columns must match for a row to link. The
+year column is fine everywhere. But `"Asia Pacific "` (with a trailing
+space) in the economics table will not match `"Asia Pacific"` in the
+population table. The result: North America and Europe link correctly;
+Asia Pacific silently vanishes.
+
+``` r
+
+merged <- merge(economics, population, by = c("region", "year"))
+nrow(merged)
+#> [1] 4
+```
+
+Four rows instead of six. Two-thirds of the data linked successfully,
+which is just enough to look plausible if you are not paying close
+attention. The analyst producing the policy briefing might not notice
+that Asia Pacific is missing entirely, especially if the briefing
+template just shows a table of whatever regions came through, without
+verifying completeness. Someone running this pipeline on autopilot might
+not catch the drop for weeks, and when they do notice, they might blame
+the data provider rather than the string encoding.
+
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+pinpoints which column in the compound key has the problem:
+
+``` r
+
+report <- join_spy(economics, population, by = c("region", "year"))
+```
+
+The whitespace issue is flagged specifically in the `region` column. We
+repair just that column and leave `year` untouched (it is numeric; there
+is nothing to trim):
+
+``` r
+
+repaired <- join_repair(economics, population, by = c("region", "year"))
+#> ✔ Repaired 2 value(s)
+result <- merge(repaired$x, repaired$y, by = c("region", "year"))
+nrow(result)
+#> [1] 6
+```
+
+Six rows. All regions, both years. The fix was trivial once the problem
+was identified; finding the problem was the hard part.
+
+Compound keys are more fragile than single keys precisely because the
+failure mode is partial. A single-column key with whitespace issues will
+drop rows in a way that is at least dramatic enough to investigate. A
+compound key with one clean column and one dirty column will match on
+some rows and fail on others, producing a result that looks reasonable
+but is quietly incomplete. The more columns in the key, the more places
+a single invisible character can hide.
+
+## The Pattern
+
+Every scenario in this vignette shares three properties.
+
+First, the data looks correct to standard inspection tools.
+[`str()`](https://rdrr.io/r/utils/str.html) shows character columns of
+the right type. [`summary()`](https://rdrr.io/r/base/summary.html)
+reports the right number of unique values (give or take).
+[`print()`](https://rdrr.io/r/base/print.html) renders the values
+identically. Nothing in the usual diagnostic workflow reveals the
+problem. The tools are not broken; they were simply not designed for
+this. [`str()`](https://rdrr.io/r/utils/str.html) tells you the type and
+length of a vector. It does not tell you whether byte 7 of the third
+element is a regular space or a non-breaking space.
+
+Second, the failure is silent. R does not warn you when a merge drops
+rows because of invisible whitespace; it just returns fewer rows. If you
+are not checking row counts before and after every join (and many
+pipelines do not), the error propagates downstream without any signal
+that something went wrong. A left join will still return all rows from
+the left table, but the columns from the right table will be filled with
+`NA` where the match failed, and those NAs might look like legitimate
+missing data.
+
+Third, the fix is mechanical once you know the cause. Trimming
+whitespace, lowercasing strings, stripping invisible Unicode: these are
+one-line operations. The repair is trivial; the diagnosis is where all
+the time goes. An analyst who knows that the problem is trailing
+whitespace can fix it in thirty seconds. An analyst who does not know
+that will spend hours comparing values that look identical, questioning
+the join logic, rebuilding the pipeline from scratch, and still not
+finding the issue.
+
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+was built to close that gap between the thirty-second fix and the hours
+of confusion that precede it. Run it before your joins, especially when
+working with data from external sources, manual entry, PDF extraction,
+or cross-system integrations. The function checks for the problems that
+[`str()`](https://rdrr.io/r/utils/str.html) and
+[`summary()`](https://rdrr.io/r/base/summary.html) were never designed
+to catch.

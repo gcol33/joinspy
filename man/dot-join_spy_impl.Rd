@@ -4,7 +4,7 @@
 \alias{.join_spy_impl}
 \title{Internal join wrapper helper}
 \usage{
-.join_spy_impl(x, y, by, type, verbose, .quiet = FALSE, ...)
+.join_spy_impl(x, y, by, type, verbose, .quiet = FALSE, backend = NULL, ...)
 }
 \arguments{
 \item{x}{Left data frame.}
@@ -19,7 +19,9 @@
 
 \item{.quiet}{Suppress all output (overrides verbose).}
 
-\item{...}{Additional args to merge.}
+\item{backend}{Join backend: NULL (auto-detect), "base", "dplyr", or "data.table".}
+
+\item{...}{Additional args passed to the underlying join function.}
 }
 \value{
 Joined data frame with report attribute.

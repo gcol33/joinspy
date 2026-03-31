@@ -183,11 +183,8 @@ analyze_join_chain <- function(tables, joins) {
     )
 
     # Simulate the join result for next step
-    current_result <- merge(left_df, right_df,
-                            by = if (is.null(names(join_by))) join_by else NULL,
-                            by.x = if (!is.null(names(join_by))) names(join_by) else NULL,
-                            by.y = if (!is.null(names(join_by))) unname(join_by) else NULL,
-                            all.x = TRUE)
+    current_result <- .perform_join(left_df, right_df, by = join_by,
+                                    type = "left")
 
     cat("\n")
   }

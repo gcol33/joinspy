@@ -10,6 +10,7 @@ join_strict(
   by,
   type = c("left", "right", "inner", "full"),
   expect = c("1:1", "1:m", "1:many", "m:1", "many:1", "m:m", "many:many"),
+  backend = NULL,
   ...
 )
 }
@@ -32,6 +33,9 @@ but each key in y matches at most one key in x}
 but each key in x matches at most one key in y}
 \item{"m:m" or "many:many"}{No cardinality constraints (allows all relationships)}
 }}
+
+\item{backend}{Character or \code{NULL}. The join backend to use. If \code{NULL}
+(default), auto-detects from input class. See \code{\link[=left_join_spy]{left_join_spy()}} for details.}
 
 \item{...}{Additional arguments passed to the underlying join function.}
 }

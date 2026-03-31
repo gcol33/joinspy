@@ -5,7 +5,7 @@ Internal join wrapper helper
 ## Usage
 
 ``` r
-.join_spy_impl(x, y, by, type, verbose, .quiet = FALSE, ...)
+.join_spy_impl(x, y, by, type, verbose, .quiet = FALSE, backend = NULL, ...)
 ```
 
 ## Arguments
@@ -34,9 +34,13 @@ Internal join wrapper helper
 
   Suppress all output (overrides verbose).
 
+- backend:
+
+  Join backend: NULL (auto-detect), "base", "dplyr", or "data.table".
+
 - ...:
 
-  Additional args to merge.
+  Additional args passed to the underlying join function.
 
 ## Value
 

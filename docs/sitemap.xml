@@ -1,9 +1,12 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://gillescolling.com/joinspy/404.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/articles/backends.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/common-issues.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/index.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/introduction.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/articles/production.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/quickstart.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/articles/why-keys-dont-match.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/authors.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/CLAUDE.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/CODE_OF_CONDUCT.html</loc></url>
@@ -18,6 +21,7 @@
 <url><loc>https://gillescolling.com/joinspy/reference/detect_cardinality.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-analyze_match.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-analyze_multicolumn_keys.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-detect_backend.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_case_mismatch.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_empty_strings.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_encoding_issues.html</loc></url>
@@ -29,6 +33,7 @@
 <url><loc>https://gillescolling.com/joinspy/reference/dot-format_bytes.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-join_spy_impl.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-levenshtein.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-perform_join.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-predict_row_counts.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-report_to_list.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-report_to_text.html</loc></url>

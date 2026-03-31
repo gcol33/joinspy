@@ -25,8 +25,14 @@ navbar:
       menu:
       - text: Quick Start
         href: articles/quickstart.html
+      - text: Why Your Keys Don't Match
+        href: articles/why-keys-dont-match.html
       - text: Common Join Problems
         href: articles/common-issues.html
+      - text: Joins in Production
+        href: articles/production.html
+      - text: Working with Backends
+        href: articles/backends.html
     github:
       icon: fab fa-github
       href: https://github.com/gcol33/joinspy
@@ -81,6 +87,13 @@ articles:
 - title: Getting Started
   navbar: ~
   contents: quickstart
-- title: Deep Dives
+- title: Key Diagnostics
   navbar: ~
-  contents: common-issues
+  contents:
+  - why-keys-dont-match
+  - common-issues
+- title: Usage Guides
+  navbar: ~
+  contents:
+  - production
+  - backends

@@ -7,7 +7,7 @@ attribute.
 ## Usage
 
 ``` r
-left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
+left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...)
 ```
 
 ## Arguments
@@ -34,6 +34,14 @@ left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
   Useful for silent pipeline operations. Use
   [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
   to access the diagnostics afterward.
+
+- backend:
+
+  Character or `NULL`. The join backend to use. If `NULL` (default),
+  auto-detects from input class: `data.table` inputs use data.table,
+  tibble inputs use dplyr, otherwise base R
+  [`merge()`](https://rdrr.io/r/base/merge.html). Explicit values:
+  `"base"`, `"dplyr"`, `"data.table"`.
 
 - ...:
 

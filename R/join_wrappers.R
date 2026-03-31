@@ -39,10 +39,11 @@ last_report <- function() {
 #' @param type Join type.
 #' @param verbose Print output.
 #' @param .quiet Suppress all output (overrides verbose).
-#' @param ... Additional args to merge.
+#' @param backend Join backend: NULL (auto-detect), "base", "dplyr", or "data.table".
+#' @param ... Additional args passed to the underlying join function.
 #' @return Joined data frame with report attribute.
 #' @keywords internal
-.join_spy_impl <- function(x, y, by, type, verbose, .quiet = FALSE, ...) {
+.join_spy_impl <- function(x, y, by, type, verbose, .quiet = FALSE, backend = NULL, ...) {
   # Get diagnostic report first
   report <- join_spy(x, y, by)
 
@@ -73,19 +74,8 @@ last_report <- function() {
     cli_alert_info("Performing {.val {type}} join...")
   }
 
-  # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
-
-  # Perform the join
-  all_x <- type %in% c("left", "full")
-  all_y <- type %in% c("right", "full")
-
-  if (is.null(names(by))) {
-    result <- merge(x, y, by = by, all.x = all_x, all.y = all_y, ...)
-  } else {
-    result <- merge(x, y, by.x = x_by, by.y = y_by, all.x = all_x, all.y = all_y, ...)
-  }
+  # Perform the join via backend dispatch
+  result <- .perform_join(x, y, by, type, backend = backend, ...)
 
   if (should_print) {
     expected <- report$expected_rows[[type]]
@@ -115,6 +105,10 @@ last_report <- function() {
 #' @param .quiet Logical. If `TRUE`, suppresses all output (overrides `verbose`).
 #'   Useful for silent pipeline operations. Use [last_report()] to access the
 #'   diagnostics afterward.
+#' @param backend Character or `NULL`. The join backend to use. If `NULL`
+#'   (default), auto-detects from input class: `data.table` inputs use
+#'   data.table, tibble inputs use dplyr, otherwise base R `merge()`.
+#'   Explicit values: `"base"`, `"dplyr"`, `"data.table"`.
 #' @param ... Additional arguments passed to the underlying join function.
 #'
 #' @return The joined data frame with a `"join_report"` attribute containing
@@ -135,8 +129,8 @@ last_report <- function() {
 #'
 #' @seealso [join_spy()], [join_strict()], [last_report()]
 #' @export
-left_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
-  .join_spy_impl(x, y, by, type = "left", verbose = verbose, .quiet = .quiet, ...)
+left_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...) {
+  .join_spy_impl(x, y, by, type = "left", verbose = verbose, .quiet = .quiet, backend = backend, ...)
 }
 
 
@@ -150,8 +144,8 @@ left_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
 #'
 #' @seealso [left_join_spy()], [join_spy()], [last_report()]
 #' @export
-right_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
-  .join_spy_impl(x, y, by, type = "right", verbose = verbose, .quiet = .quiet, ...)
+right_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...) {
+  .join_spy_impl(x, y, by, type = "right", verbose = verbose, .quiet = .quiet, backend = backend, ...)
 }
 
 
@@ -165,8 +159,8 @@ right_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
 #'
 #' @seealso [left_join_spy()], [join_spy()], [last_report()]
 #' @export
-inner_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
-  .join_spy_impl(x, y, by, type = "inner", verbose = verbose, .quiet = .quiet, ...)
+inner_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...) {
+  .join_spy_impl(x, y, by, type = "inner", verbose = verbose, .quiet = .quiet, backend = backend, ...)
 }
 
 
@@ -180,6 +174,6 @@ inner_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
 #'
 #' @seealso [left_join_spy()], [join_spy()], [last_report()]
 #' @export
-full_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, ...) {
-  .join_spy_impl(x, y, by, type = "full", verbose = verbose, .quiet = .quiet, ...)
+full_join_spy <- function(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...) {
+  .join_spy_impl(x, y, by, type = "full", verbose = verbose, .quiet = .quiet, backend = backend, ...)
 }

@@ -4,7 +4,7 @@
 \alias{left_join_spy}
 \title{Left Join with Diagnostics}
 \usage{
-left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
+left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...)
 }
 \arguments{
 \item{x}{A data frame (left table).}
@@ -18,6 +18,11 @@ left_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
 \item{.quiet}{Logical. If \code{TRUE}, suppresses all output (overrides \code{verbose}).
 Useful for silent pipeline operations. Use \code{\link[=last_report]{last_report()}} to access the
 diagnostics afterward.}
+
+\item{backend}{Character or \code{NULL}. The join backend to use. If \code{NULL}
+(default), auto-detects from input class: \code{data.table} inputs use
+data.table, tibble inputs use dplyr, otherwise base R \code{merge()}.
+Explicit values: \code{"base"}, \code{"dplyr"}, \code{"data.table"}.}
 
 \item{...}{Additional arguments passed to the underlying join function.}
 }

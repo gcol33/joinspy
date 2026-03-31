@@ -12,12 +12,11 @@ coverage](https://codecov.io/gh/gcol33/joinspy/graph/badge.svg)](https://app.cod
 [![License:
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Diagnostic Tools for Data Frame Joins in R**
+**Find out why your keys don’t match.**
 
-The `joinspy` package helps you understand and debug join operations by
-analyzing key columns before and after joins, detecting common issues,
-and explaining unexpected row count changes. Catch problems early
-instead of discovering them when downstream analysis breaks.
+You ran a left join and lost 40% of your rows. dplyr says “many-to-many
+relationship.” joinspy says 12 keys have trailing spaces, 8 differ only
+by case, and 3 contain invisible Unicode characters. Then it fixes them.
 
 ## Quick Start
 
@@ -25,98 +24,131 @@ instead of discovering them when downstream analysis breaks.
 
 library(joinspy)
 
-# Pre-join diagnostics
-report <- join_spy(orders, customers, by = "customer_id")
-summary(report)
+join_spy(orders, customers, by = "customer_id")
 
-# Quick pass/fail check
-key_check(orders, customers, by = "customer_id")
+repaired <- join_repair(orders, customers, by = "customer_id")
 
-# Safe join with cardinality enforcement
-result <- join_strict(orders, customers, by = "customer_id", expect = "1:1")
-
-# Auto-repair common issues
-orders_fixed <- join_repair(orders, by = "customer_id")
+suggest_repairs(join_spy(orders, customers, by = "customer_id"))
 ```
 
-## Statement of Need
+## The Problem
 
-Joins silently produce unexpected results when:
+Most join failures come down to string-level problems in keys:
 
-- **Duplicate keys** cause row multiplication
-- **Trailing whitespace** breaks matches invisibly
-- **Case mismatches** (“ABC” vs “abc”) prevent joins
-- **Encoding issues** make identical-looking strings different
-- **NA values** in keys cause unexpected behavior
-- **Type mismatches** (character “1” vs numeric 1) fail silently
+- `"Alice"` vs `"Alice "` (trailing space, invisible)
+- `"NYC"` vs `"nyc"` (case)
+- Zero-width spaces, BOMs, non-breaking spaces that look like regular
+  spaces but aren’t
+- `"Johansson"` vs `"Johannson"` (one character off)
+- Empty strings matching each other but not `NA`
 
-These problems are discovered only when downstream analysis breaks.
-`joinspy` catches them upfront by analyzing keys **before** you join,
-explaining **why** joins misbehave, and showing **where** the problems
-are.
+No errors, no warnings. Rows drop, and you find out three pipeline
+stages later when a dashboard goes blank.
 
-## Features
+## What joinspy Does
 
-### Pre-Join Diagnostics
+### Diagnose
 
-- **[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)**:
-  Comprehensive pre-flight diagnostic report
-- **[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)**:
-  Quick pass/fail key quality assessment
-- **[`key_duplicates()`](https://gillescolling.com/joinspy/reference/key_duplicates.md)**:
-  Find and locate duplicate keys
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+examines keys before the join:
 
-### Post-Join Analysis
+``` r
 
-- **[`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)**:
-  Explain row count changes after a join
-- **[`join_diff()`](https://gillescolling.com/joinspy/reference/join_diff.md)**:
-  Compare before/after states
+orders <- data.frame(
+  id = c("A", "B ", "c", "D"),
+  amount = c(100, 200, 300, 400),
+  stringsAsFactors = FALSE
+)
 
-### Safe Join Wrappers
+customers <- data.frame(
+  id = c("A", "B", "C", "E"),
+  name = c("Alice", "Bob", "Carol", "Eve"),
+  stringsAsFactors = FALSE
+)
 
-- **[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)**:
-  Join with cardinality enforcement (`1:1`, `1:m`, `m:1`, `m:m`)
-- **[`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)**,
-  **[`right_join_spy()`](https://gillescolling.com/joinspy/reference/right_join_spy.md)**,
-  **[`inner_join_spy()`](https://gillescolling.com/joinspy/reference/inner_join_spy.md)**,
-  **[`full_join_spy()`](https://gillescolling.com/joinspy/reference/full_join_spy.md)**:
-  Joins with automatic diagnostics
-- **[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)**:
-  Retrieve diagnostics after silent (`.quiet = TRUE`) joins
+join_spy(orders, customers, by = "id")
+#> -- Join Diagnostic Report --
+#> Match rate (left): 25%
+#>
+#> Issues Detected:
+#>   ! "B " has trailing whitespace (would match "B")
+#>   ! "c" vs "C" — case mismatch
+#>   x "D" has no match in right table
+```
 
-### Auto-Repair
+### Repair
 
-- **[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)**:
-  Fix whitespace, case, encoding, empty strings automatically
-- **[`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)**:
-  Generate R code snippets to fix detected issues
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+fixes the issues, or previews what it would change with
+`dry_run = TRUE`.
+[`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
+prints the R code instead of running it.
 
-### Advanced Analysis
+``` r
 
-- **[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)**:
-  Determine actual relationship (1:1, 1:m, m:1, m:m)
-- **[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)**:
-  Warn about Cartesian product explosions
-- **[`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)**:
-  Analyze multi-table join sequences
+join_repair(orders, customers, by = "id", dry_run = TRUE)
 
-### Visualization & Logging
+repaired <- join_repair(orders, customers, by = "id",
+                        standardize_case = "upper")
 
-- **[`plot()`](https://rdrr.io/r/graphics/plot.default.html)**: Venn
-  diagram of key overlap (with optional `file` param to save)
-- **[`summary()`](https://rdrr.io/r/base/summary.html)**: Compact
-  metrics table (with optional `format` param for text/markdown)
-- **[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)**:
-  Write reports to file (text/JSON/RDS)
-- **[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)**:
-  Enable automatic logging
+suggest_repairs(join_spy(orders, customers, by = "id"))
+#> x$id <- trimws(x$id)
+#> x$id <- toupper(x$id)
+#> y$id <- toupper(y$id)
+```
+
+### Predict
+
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+also estimates result size for each join type:
+
+``` r
+
+report <- join_spy(orders, customers, by = "id")
+report$expected_rows
+#> inner_join: 1
+#> left_join:  4
+#> right_join: 4
+#> full_join:  7
+```
+
+### Explain
+
+[`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.md)
+works after the join, on the result:
+
+``` r
+
+result <- merge(orders, customers, by = "id", all.x = TRUE)
+join_explain(result, orders, customers, by = "id", type = "left")
+#> Result has same row count as left table
+#> ! 3 left key(s) have no match in right table
+```
+
+## Also Includes
+
+The package ships join wrappers
+([`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md),
+[`inner_join_spy()`](https://gillescolling.com/joinspy/reference/inner_join_spy.md),
+etc.) that run diagnostics before joining and attach the report as an
+attribute.
+[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
+enforces cardinality (`1:1`, `1:m`, `m:1`, `m:m`) and errors on
+violation.
+[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)
+warns before a many-to-many blows up your row count.
+[`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
+handles multi-step A-B-C sequences.
+
+Joins auto-detect the input class (tibble, data.table, data.frame) and
+dispatch to the native join engine. Override with `backend = "dplyr"` or
+`backend = "data.table"` if needed.
 
 ## Installation
 
 ``` r
 
-# Install from CRAN (when available)
+# Install from CRAN
 install.packages("joinspy")
 
 # Or install development version from GitHub
@@ -124,103 +156,10 @@ install.packages("joinspy")
 pak::pak("gcol33/joinspy")
 ```
 
-## Usage Examples
-
-### Pre-Join Diagnostics
-
-``` r
-
-library(joinspy)
-
-orders <- data.frame(
-  customer_id = c("A", "B", "B", "C", "D "),
-  amount = c(100, 200, 150, 300, 50),
-  stringsAsFactors = FALSE
-)
-
-customers <- data.frame(
-  customer_id = c("A", "B", "C", "D", "E"),
-  name = c("Alice", "Bob", "Carol", "David", "Eve"),
-  stringsAsFactors = FALSE
-)
-
-# Full diagnostic report
-report <- join_spy(orders, customers, by = "customer_id")
-
-# Compact summary
-summary(report)
-#>              metric value
-#> 1         left_rows     5
-#> 2        right_rows     5
-#> 3   left_unique_keys    4
-#> 4  right_unique_keys    5
-#> ...
-```
-
-### Cardinality Enforcement
-
-``` r
-
-# Succeeds - 1:1 relationship
-products <- data.frame(id = 1:3, name = c("Widget", "Gadget", "Gizmo"))
-prices <- data.frame(id = 1:3, price = c(10, 20, 30))
-
-join_strict(products, prices, by = "id", expect = "1:1")
-
-# Fails - duplicates violate 1:1
-prices_dup <- data.frame(id = c(1, 1, 2, 3), price = c(10, 15, 20, 30))
-join_strict(products, prices_dup, by = "id", expect = "1:1")
-#> Error: Cardinality violation: expected '1:1' but found '1:m'
-```
-
-### Auto-Repair
-
-``` r
-
-messy <- data.frame(
-  id = c(" A", "B ", "  C  "),
-  value = 1:3,
-  stringsAsFactors = FALSE
-)
-
-# Preview what would be fixed
-join_repair(messy, by = "id", dry_run = TRUE)
-
-# Apply fixes
-fixed <- join_repair(messy, by = "id")
-fixed$id
-#> [1] "A" "B" "C"
-```
-
-### Silent Pipeline Mode
-
-``` r
-
-# Silent join for pipelines
-result <- left_join_spy(orders, customers, by = "customer_id", .quiet = TRUE)
-
-# Access diagnostics afterward
-last_report()$match_analysis$match_rate
-#> [1] 0.8
-```
-
-### Visualization
-
-``` r
-
-report <- join_spy(orders, customers, by = "customer_id")
-
-# Venn diagram
-plot(report)
-
-# Save to file
-plot(report, file = "overlap.png")
-```
-
 ## Documentation
 
 - [Getting
-  Started](https://gillescolling.com/joinspy/articles/introduction.html)
+  Started](https://gillescolling.com/joinspy/articles/quickstart.html)
 - [Common Join
   Issues](https://gillescolling.com/joinspy/articles/common-issues.html)
 - [Function
@@ -228,13 +167,16 @@ plot(report, file = "overlap.png")
 
 ## Related Work
 
-- [dplyr](https://dplyr.tidyverse.org/) - The `relationship` argument
-  provides basic cardinality checks
-- [tidylog](https://github.com/elbersb/tidylog) - Logs row count changes
-  (but doesn’t diagnose causes)
+| Package | Focus |
+|----|----|
+| [dplyr](https://dplyr.tidyverse.org/) 1.1+ | Cardinality checks via `relationship` argument |
+| [powerjoin](https://github.com/moodymudskipper/powerjoin) | 12-level configurable checks, key preprocessing |
+| [joyn](https://github.com/randrescastaneda/joyn) | Match-status reporting variable per row |
+| [tidylog](https://github.com/elbersb/tidylog) | Logs row count changes after joins |
 
-`joinspy` fills the gap: it tells you **why** joins misbehave and
-**where** the problems are.
+joinspy focuses on string-level key diagnostics: whitespace, case,
+encoding, typos, and type mismatches. It identifies which specific keys
+failed, why, and can fix them automatically.
 
 ## Support
 

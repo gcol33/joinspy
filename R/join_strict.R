@@ -21,6 +21,8 @@
 #'     but each key in x matches at most one key in y}
 #'   \item{"m:m" or "many:many"}{No cardinality constraints (allows all relationships)}
 #' }
+#' @param backend Character or `NULL`. The join backend to use. If `NULL`
+#'   (default), auto-detects from input class. See [left_join_spy()] for details.
 #' @param ... Additional arguments passed to the underlying join function.
 #'
 #' @return The joined data frame if the cardinality constraint is satisfied.
@@ -41,7 +43,7 @@
 #' @export
 join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
                         expect = c("1:1", "1:m", "1:many", "m:1", "many:1", "m:m", "many:many"),
-                        ...) {
+                        backend = NULL, ...) {
   type <- match.arg(type)
   expect <- match.arg(expect)
 
@@ -115,16 +117,6 @@ join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
     ), call. = FALSE)
   }
 
-  # Perform the join using base R merge
-  all_x <- type %in% c("left", "full")
-  all_y <- type %in% c("right", "full")
-
-  # Build by argument for merge
-  if (is.null(names(by))) {
-    result <- merge(x, y, by = by, all.x = all_x, all.y = all_y, ...)
-  } else {
-    result <- merge(x, y, by.x = x_by, by.y = y_by, all.x = all_x, all.y = all_y, ...)
-  }
-
-  result
+  # Perform the join via backend dispatch
+  .perform_join(x, y, by, type, backend = backend, ...)
 }

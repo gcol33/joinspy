@@ -37,7 +37,7 @@
 
     <a class="navbar-brand me-2" href="index.html">joinspy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.7.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,7 +52,10 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="articles/quickstart.html">Quick Start</a></li>
+    <li><a class="dropdown-item" href="articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="articles/common-issues.html">Common Join Problems</a></li>
+    <li><a class="dropdown-item" href="articles/production.html">Joins in Production</a></li>
+    <li><a class="dropdown-item" href="articles/backends.html">Working with Backends</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -81,126 +84,115 @@
 <div class="page-header"><h1 id="joinspy">joinspy<a class="anchor" aria-label="anchor" href="#joinspy"></a>
 </h1></div>
 <p><a href="https://CRAN.R-project.org/package=joinspy" class="external-link"><img src="https://www.r-pkg.org/badges/version/joinspy" alt="CRAN status"></a> <a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/joinspy" alt="CRAN downloads"></a> <a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/joinspy" alt="Monthly downloads"></a> <a href="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a> <a href="https://app.codecov.io/gh/gcol33/joinspy" class="external-link"><img src="https://codecov.io/gh/gcol33/joinspy/graph/badge.svg" alt="Codecov test coverage"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
-<p><strong>Diagnostic Tools for Data Frame Joins in R</strong></p>
-<p>The <code>joinspy</code> package helps you understand and debug join operations by analyzing key columns before and after joins, detecting common issues, and explaining unexpected row count changes. Catch problems early instead of discovering them when downstream analysis breaks.</p>
+<p><strong>Find out why your keys don’t match.</strong></p>
+<p>You ran a left join and lost 40% of your rows. dplyr says “many-to-many relationship.” joinspy says 12 keys have trailing spaces, 8 differ only by case, and 3 contain invisible Unicode characters. Then it fixes them.</p>
 <div class="section level2">
 <h2 id="quick-start">Quick Start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gillescolling.com/joinspy/">joinspy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Pre-join diagnostics</span></span>
-<span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Quick pass/fail check</span></span>
-<span><span class="fu"><a href="reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
+<span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Safe join with cardinality enforcement</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, expect <span class="op">=</span> <span class="st">"1:1"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Auto-repair common issues</span></span>
-<span><span class="va">orders_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="statement-of-need">Statement of Need<a class="anchor" aria-label="anchor" href="#statement-of-need"></a>
+<h2 id="the-problem">The Problem<a class="anchor" aria-label="anchor" href="#the-problem"></a>
 </h2>
-<p>Joins silently produce unexpected results when:</p>
+<p>Most join failures come down to string-level problems in keys:</p>
 <ul>
 <li>
-<strong>Duplicate keys</strong> cause row multiplication</li>
+<code>"Alice"</code> vs <code>"Alice "</code> (trailing space, invisible)</li>
 <li>
-<strong>Trailing whitespace</strong> breaks matches invisibly</li>
+<code>"NYC"</code> vs <code>"nyc"</code> (case)</li>
+<li>Zero-width spaces, BOMs, non-breaking spaces that look like regular spaces but aren’t</li>
 <li>
-<strong>Case mismatches</strong> (“ABC” vs “abc”) prevent joins</li>
-<li>
-<strong>Encoding issues</strong> make identical-looking strings different</li>
-<li>
-<strong>NA values</strong> in keys cause unexpected behavior</li>
-<li>
-<strong>Type mismatches</strong> (character “1” vs numeric 1) fail silently</li>
+<code>"Johansson"</code> vs <code>"Johannson"</code> (one character off)</li>
+<li>Empty strings matching each other but not <code>NA</code>
+</li>
 </ul>
-<p>These problems are discovered only when downstream analysis breaks. <code>joinspy</code> catches them upfront by analyzing keys <strong>before</strong> you join, explaining <strong>why</strong> joins misbehave, and showing <strong>where</strong> the problems are.</p>
+<p>No errors, no warnings. Rows drop, and you find out three pipeline stages later when a dashboard goes blank.</p>
 </div>
 <div class="section level2">
-<h2 id="features">Features<a class="anchor" aria-label="anchor" href="#features"></a>
+<h2 id="what-joinspy-does">What joinspy Does<a class="anchor" aria-label="anchor" href="#what-joinspy-does"></a>
 </h2>
 <div class="section level3">
-<h3 id="pre-join-diagnostics">Pre-Join Diagnostics<a class="anchor" aria-label="anchor" href="#pre-join-diagnostics"></a>
+<h3 id="diagnose">Diagnose<a class="anchor" aria-label="anchor" href="#diagnose"></a>
 </h3>
-<ul>
-<li>
-<strong><code><a href="reference/join_spy.html">join_spy()</a></code></strong>: Comprehensive pre-flight diagnostic report</li>
-<li>
-<strong><code><a href="reference/key_check.html">key_check()</a></code></strong>: Quick pass/fail key quality assessment</li>
-<li>
-<strong><code><a href="reference/key_duplicates.html">key_duplicates()</a></code></strong>: Find and locate duplicate keys</li>
-</ul>
+<p><code><a href="reference/join_spy.html">join_spy()</a></code> examines keys before the join:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B "</span>, <span class="st">"c"</span>, <span class="st">"D"</span><span class="op">)</span>,</span>
+<span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">200</span>, <span class="fl">300</span>, <span class="fl">400</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">customers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"C"</span>, <span class="st">"E"</span><span class="op">)</span>,</span>
+<span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Alice"</span>, <span class="st">"Bob"</span>, <span class="st">"Carol"</span>, <span class="st">"Eve"</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; -- Join Diagnostic Report --</span></span>
+<span><span class="co">#&gt; Match rate (left): 25%</span></span>
+<span><span class="co">#&gt;</span></span>
+<span><span class="co">#&gt; Issues Detected:</span></span>
+<span><span class="co">#&gt;   ! "B " has trailing whitespace (would match "B")</span></span>
+<span><span class="co">#&gt;   ! "c" vs "C" — case mismatch</span></span>
+<span><span class="co">#&gt;   x "D" has no match in right table</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="post-join-analysis">Post-Join Analysis<a class="anchor" aria-label="anchor" href="#post-join-analysis"></a>
+<h3 id="repair">Repair<a class="anchor" aria-label="anchor" href="#repair"></a>
 </h3>
-<ul>
-<li>
-<strong><code><a href="reference/join_explain.html">join_explain()</a></code></strong>: Explain row count changes after a join</li>
-<li>
-<strong><code><a href="reference/join_diff.html">join_diff()</a></code></strong>: Compare before/after states</li>
-</ul>
+<p><code><a href="reference/join_repair.html">join_repair()</a></code> fixes the issues, or previews what it would change with <code>dry_run = TRUE</code>. <code><a href="reference/suggest_repairs.html">suggest_repairs()</a></code> prints the R code instead of running it.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>,</span>
+<span>                        standardize_case <span class="op">=</span> <span class="st">"upper"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; x$id &lt;- trimws(x$id)</span></span>
+<span><span class="co">#&gt; x$id &lt;- toupper(x$id)</span></span>
+<span><span class="co">#&gt; y$id &lt;- toupper(y$id)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="safe-join-wrappers">Safe Join Wrappers<a class="anchor" aria-label="anchor" href="#safe-join-wrappers"></a>
+<h3 id="predict">Predict<a class="anchor" aria-label="anchor" href="#predict"></a>
 </h3>
-<ul>
-<li>
-<strong><code><a href="reference/join_strict.html">join_strict()</a></code></strong>: Join with cardinality enforcement (<code>1:1</code>, <code>1:m</code>, <code>m:1</code>, <code>m:m</code>)</li>
-<li>
-<strong><code><a href="reference/left_join_spy.html">left_join_spy()</a></code></strong>, <strong><code><a href="reference/right_join_spy.html">right_join_spy()</a></code></strong>, <strong><code><a href="reference/inner_join_spy.html">inner_join_spy()</a></code></strong>, <strong><code><a href="reference/full_join_spy.html">full_join_spy()</a></code></strong>: Joins with automatic diagnostics</li>
-<li>
-<strong><code><a href="reference/last_report.html">last_report()</a></code></strong>: Retrieve diagnostics after silent (<code>.quiet = TRUE</code>) joins</li>
-</ul>
+<p><code><a href="reference/join_spy.html">join_spy()</a></code> also estimates result size for each join type:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
+<span><span class="va">report</span><span class="op">$</span><span class="va">expected_rows</span></span>
+<span><span class="co">#&gt; inner_join: 1</span></span>
+<span><span class="co">#&gt; left_join:  4</span></span>
+<span><span class="co">#&gt; right_join: 4</span></span>
+<span><span class="co">#&gt; full_join:  7</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="auto-repair">Auto-Repair<a class="anchor" aria-label="anchor" href="#auto-repair"></a>
+<h3 id="explain">Explain<a class="anchor" aria-label="anchor" href="#explain"></a>
 </h3>
-<ul>
-<li>
-<strong><code><a href="reference/join_repair.html">join_repair()</a></code></strong>: Fix whitespace, case, encoding, empty strings automatically</li>
-<li>
-<strong><code><a href="reference/suggest_repairs.html">suggest_repairs()</a></code></strong>: Generate R code snippets to fix detected issues</li>
-</ul>
+<p><code><a href="reference/join_explain.html">join_explain()</a></code> works after the join, on the result:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/join_explain.html">join_explain</a></span><span class="op">(</span><span class="va">result</span>, <span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, type <span class="op">=</span> <span class="st">"left"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Result has same row count as left table</span></span>
+<span><span class="co">#&gt; ! 3 left key(s) have no match in right table</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="advanced-analysis">Advanced Analysis<a class="anchor" aria-label="anchor" href="#advanced-analysis"></a>
-</h3>
-<ul>
-<li>
-<strong><code><a href="reference/detect_cardinality.html">detect_cardinality()</a></code></strong>: Determine actual relationship (1:1, 1:m, m:1, m:m)</li>
-<li>
-<strong><code><a href="reference/check_cartesian.html">check_cartesian()</a></code></strong>: Warn about Cartesian product explosions</li>
-<li>
-<strong><code><a href="reference/analyze_join_chain.html">analyze_join_chain()</a></code></strong>: Analyze multi-table join sequences</li>
-</ul>
 </div>
-<div class="section level3">
-<h3 id="visualization--logging">Visualization &amp; Logging<a class="anchor" aria-label="anchor" href="#visualization--logging"></a>
-</h3>
-<ul>
-<li>
-<strong><code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code></strong>: Venn diagram of key overlap (with optional <code>file</code> param to save)</li>
-<li>
-<strong><code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code></strong>: Compact metrics table (with optional <code>format</code> param for text/markdown)</li>
-<li>
-<strong><code><a href="reference/log_report.html">log_report()</a></code></strong>: Write reports to file (text/JSON/RDS)</li>
-<li>
-<strong><code><a href="reference/set_log_file.html">set_log_file()</a></code></strong>: Enable automatic logging</li>
-</ul>
-</div>
+<div class="section level2">
+<h2 id="also-includes">Also Includes<a class="anchor" aria-label="anchor" href="#also-includes"></a>
+</h2>
+<p>The package ships join wrappers (<code><a href="reference/left_join_spy.html">left_join_spy()</a></code>, <code><a href="reference/inner_join_spy.html">inner_join_spy()</a></code>, etc.) that run diagnostics before joining and attach the report as an attribute. <code><a href="reference/join_strict.html">join_strict()</a></code> enforces cardinality (<code>1:1</code>, <code>1:m</code>, <code>m:1</code>, <code>m:m</code>) and errors on violation. <code><a href="reference/check_cartesian.html">check_cartesian()</a></code> warns before a many-to-many blows up your row count. <code><a href="reference/analyze_join_chain.html">analyze_join_chain()</a></code> handles multi-step A-B-C sequences.</p>
+<p>Joins auto-detect the input class (tibble, data.table, data.frame) and dispatch to the native join engine. Override with <code>backend = "dplyr"</code> or <code>backend = "data.table"</code> if needed.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Install from CRAN (when available)</span></span>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># Install from CRAN</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"joinspy"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Or install development version from GitHub</span></span>
@@ -208,100 +200,10 @@
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu">pak</span><span class="op">(</span><span class="st">"gcol33/joinspy"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="usage-examples">Usage Examples<a class="anchor" aria-label="anchor" href="#usage-examples"></a>
-</h2>
-<div class="section level3">
-<h3 id="pre-join-diagnostics-1">Pre-Join Diagnostics<a class="anchor" aria-label="anchor" href="#pre-join-diagnostics-1"></a>
-</h3>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gillescolling.com/joinspy/">joinspy</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"B"</span>, <span class="st">"C"</span>, <span class="st">"D "</span><span class="op">)</span>,</span>
-<span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">200</span>, <span class="fl">150</span>, <span class="fl">300</span>, <span class="fl">50</span><span class="op">)</span>,</span>
-<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">customers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"C"</span>, <span class="st">"D"</span>, <span class="st">"E"</span><span class="op">)</span>,</span>
-<span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Alice"</span>, <span class="st">"Bob"</span>, <span class="st">"Carol"</span>, <span class="st">"David"</span>, <span class="st">"Eve"</span><span class="op">)</span>,</span>
-<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Full diagnostic report</span></span>
-<span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Compact summary</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
-<span><span class="co">#&gt;              metric value</span></span>
-<span><span class="co">#&gt; 1         left_rows     5</span></span>
-<span><span class="co">#&gt; 2        right_rows     5</span></span>
-<span><span class="co">#&gt; 3   left_unique_keys    4</span></span>
-<span><span class="co">#&gt; 4  right_unique_keys    5</span></span>
-<span><span class="co">#&gt; ...</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="cardinality-enforcement">Cardinality Enforcement<a class="anchor" aria-label="anchor" href="#cardinality-enforcement"></a>
-</h3>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Succeeds - 1:1 relationship</span></span>
-<span><span class="va">products</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Widget"</span>, <span class="st">"Gadget"</span>, <span class="st">"Gizmo"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">prices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, price <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span>, <span class="fl">30</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">products</span>, <span class="va">prices</span>, by <span class="op">=</span> <span class="st">"id"</span>, expect <span class="op">=</span> <span class="st">"1:1"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Fails - duplicates violate 1:1</span></span>
-<span><span class="va">prices_dup</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>, price <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">15</span>, <span class="fl">20</span>, <span class="fl">30</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">products</span>, <span class="va">prices_dup</span>, by <span class="op">=</span> <span class="st">"id"</span>, expect <span class="op">=</span> <span class="st">"1:1"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error: Cardinality violation: expected '1:1' but found '1:m'</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="auto-repair-1">Auto-Repair<a class="anchor" aria-label="anchor" href="#auto-repair-1"></a>
-</h3>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">messy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">" A"</span>, <span class="st">"B "</span>, <span class="st">"  C  "</span><span class="op">)</span>,</span>
-<span>  value <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>,</span>
-<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Preview what would be fixed</span></span>
-<span><span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">messy</span>, by <span class="op">=</span> <span class="st">"id"</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Apply fixes</span></span>
-<span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">messy</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
-<span><span class="va">fixed</span><span class="op">$</span><span class="va">id</span></span>
-<span><span class="co">#&gt; [1] "A" "B" "C"</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="silent-pipeline-mode">Silent Pipeline Mode<a class="anchor" aria-label="anchor" href="#silent-pipeline-mode"></a>
-</h3>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Silent join for pipelines</span></span>
-<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Access diagnostics afterward</span></span>
-<span><span class="fu"><a href="reference/last_report.html">last_report</a></span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span></span>
-<span><span class="co">#&gt; [1] 0.8</span></span></code></pre></div>
-</div>
-<div class="section level3">
-<h3 id="visualization">Visualization<a class="anchor" aria-label="anchor" href="#visualization"></a>
-</h3>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Venn diagram</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Save to file</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">report</span>, file <span class="op">=</span> <span class="st">"overlap.png"</span><span class="op">)</span></span></code></pre></div>
-</div>
-</div>
-<div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
 <ul>
-<li><a href="https://gillescolling.com/joinspy/articles/introduction.html">Getting Started</a></li>
+<li><a href="https://gillescolling.com/joinspy/articles/quickstart.html">Getting Started</a></li>
 <li><a href="https://gillescolling.com/joinspy/articles/common-issues.html">Common Join Issues</a></li>
 <li><a href="https://gillescolling.com/joinspy/reference/index.html">Function Reference</a></li>
 </ul>
@@ -309,13 +211,36 @@
 <div class="section level2">
 <h2 id="related-work">Related Work<a class="anchor" aria-label="anchor" href="#related-work"></a>
 </h2>
-<ul>
-<li>
-<a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a> - The <code>relationship</code> argument provides basic cardinality checks</li>
-<li>
-<a href="https://github.com/elbersb/tidylog" class="external-link">tidylog</a> - Logs row count changes (but doesn’t diagnose causes)</li>
-</ul>
-<p><code>joinspy</code> fills the gap: it tells you <strong>why</strong> joins misbehave and <strong>where</strong> the problems are.</p>
+<table class="table">
+<colgroup>
+<col width="56%">
+<col width="43%">
+</colgroup>
+<thead><tr>
+<th>Package</th>
+<th>Focus</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>
+<a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a> 1.1+</td>
+<td>Cardinality checks via <code>relationship</code> argument</td>
+</tr>
+<tr>
+<td><a href="https://github.com/moodymudskipper/powerjoin" class="external-link">powerjoin</a></td>
+<td>12-level configurable checks, key preprocessing</td>
+</tr>
+<tr>
+<td><a href="https://github.com/randrescastaneda/joyn" class="external-link">joyn</a></td>
+<td>Match-status reporting variable per row</td>
+</tr>
+<tr>
+<td><a href="https://github.com/elbersb/tidylog" class="external-link">tidylog</a></td>
+<td>Logs row count changes after joins</td>
+</tr>
+</tbody>
+</table>
+<p>joinspy focuses on string-level key diagnostics: whitespace, case, encoding, typos, and type mismatches. It identifies which specific keys failed, why, and can fix them automatically.</p>
 </div>
 <div class="section level2">
 <h2 id="support">Support<a class="anchor" aria-label="anchor" href="#support"></a>
@@ -335,12 +260,12 @@
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co">@software{joinspy,</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">  author = {Colling, Gilles},</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">  title = {joinspy: Diagnostic Tools for Data Frame Joins},</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">  year = {2025},</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">  url = {https://github.com/gcol33/joinspy}</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co">@software{joinspy,</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co">  author = {Colling, Gilles},</span></span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">  title = {joinspy: Diagnostic Tools for Data Frame Joins},</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">  year = {2025},</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">  url = {https://github.com/gcol33/joinspy}</span></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="co">}</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">

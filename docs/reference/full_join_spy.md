@@ -5,7 +5,7 @@ Performs a full join and automatically prints diagnostic information.
 ## Usage
 
 ``` r
-full_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
+full_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, backend = NULL, ...)
 ```
 
 ## Arguments
@@ -32,6 +32,14 @@ full_join_spy(x, y, by, verbose = TRUE, .quiet = FALSE, ...)
   Useful for silent pipeline operations. Use
   [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
   to access the diagnostics afterward.
+
+- backend:
+
+  Character or `NULL`. The join backend to use. If `NULL` (default),
+  auto-detects from input class: `data.table` inputs use data.table,
+  tibble inputs use dplyr, otherwise base R
+  [`merge()`](https://rdrr.io/r/base/merge.html). Explicit values:
+  `"base"`, `"dplyr"`, `"data.table"`.
 
 - ...:
 
