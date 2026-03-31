@@ -15,11 +15,11 @@
 #' @param expect Character. The expected cardinality relationship. One of:
 #' \describe{
 #'   \item{"1:1"}{Each key in x matches at most one key in y, and vice versa}
-#'   \item{"1:m" or "1:many"}{Each key in x can match multiple keys in y,
+#'   \item{"1:n" or "1:many"}{Each key in x can match multiple keys in y,
 #'     but each key in y matches at most one key in x}
-#'   \item{"m:1" or "many:1"}{Each key in y can match multiple keys in x,
+#'   \item{"n:1" or "many:1"}{Each key in y can match multiple keys in x,
 #'     but each key in x matches at most one key in y}
-#'   \item{"m:m" or "many:many"}{No cardinality constraints (allows all relationships)}
+#'   \item{"n:m" or "many:many"}{No cardinality constraints (allows all relationships)}
 #' }
 #' @param backend Character or `NULL`. The join backend to use. If `NULL`
 #'   (default), auto-detects from input class. See [left_join_spy()] for details.
@@ -42,7 +42,7 @@
 #' @seealso [join_spy()], [left_join_spy()]
 #' @export
 join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
-                        expect = c("1:1", "1:m", "1:many", "m:1", "many:1", "m:m", "many:many"),
+                        expect = c("1:1", "1:n", "1:many", "n:1", "many:1", "n:m", "many:many"),
                         backend = NULL, ...) {
   type <- match.arg(type)
   expect <- match.arg(expect)
@@ -75,40 +75,40 @@ join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
   # Normalize expect
   expect_norm <- switch(
     expect,
-    "1:many" = "1:m",
-    "many:1" = "m:1",
-    "many:many" = "m:m",
+    "1:many" = "1:n",
+    "many:1" = "n:1",
+    "many:many" = "n:m",
     expect
   )
 
   # Check cardinality constraint
   actual <- if (x_has_dups && y_has_dups) {
-    "m:m"
+    "n:m"
   } else if (x_has_dups) {
-    "m:1"
+    "n:1"
   } else if (y_has_dups) {
-    "1:m"
+    "1:n"
   } else {
     "1:1"
   }
 
   # Determine if constraint is satisfied
-  # 1:1 is the most restrictive, m:m is the least
-  cardinality_levels <- c("1:1" = 1, "1:m" = 2, "m:1" = 2, "m:m" = 3)
+  # 1:1 is the most restrictive, n:m is the least
+  cardinality_levels <- c("1:1" = 1, "1:n" = 2, "n:1" = 2, "n:m" = 3)
 
   actual_level <- cardinality_levels[actual]
   expect_level <- cardinality_levels[expect_norm]
 
-  # Special handling for 1:m vs m:1 (they're incompatible with each other)
+  # Special handling for 1:n vs n:1 (they're incompatible with each other)
   violates <- FALSE
   if (expect_norm == "1:1" && actual != "1:1") {
     violates <- TRUE
-  } else if (expect_norm == "1:m" && x_has_dups) {
+  } else if (expect_norm == "1:n" && x_has_dups) {
     violates <- TRUE
-  } else if (expect_norm == "m:1" && y_has_dups) {
+  } else if (expect_norm == "n:1" && y_has_dups) {
     violates <- TRUE
   }
-  # m:m allows everything
+  # n:m allows everything
 
   if (violates) {
     stop(sprintf(

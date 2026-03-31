@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 library(joinspy)
 ```
 
-joinspy diagnoses join keys before you join. It surfaces the string-level problems that kill match rates (whitespace, case, encoding, typos) and offers one-call repair. Works with base R, dplyr, and data.table.
+joinspy diagnoses join keys and performs joins with cardinality enforcement. It surfaces the string-level problems that prevent keys from matching (whitespace, case, encoding, typos), offers one-call repair, and provides join wrappers where you specify the expected cardinality (`1:1`, `1:n`, `n:1`, `n:m`). Works with base R, dplyr, and data.table.
 
 ## String Diagnostics
 
@@ -400,11 +400,11 @@ The `expect` argument accepts four cardinality levels:
 
 - `"1:1"`: both sides have unique keys. Any duplicate on either side is an error.
 
-- `"1:m"`: the left table has unique keys, the right may repeat. The classic lookup-table join.
+- `"1:n"`: the left table has unique keys, the right may repeat. The classic lookup-table join.
 
-- `"m:1"`: the mirror of `"1:m"`. The right table is the lookup.
+- `"n:1"`: the mirror of `"1:n"`. The right table is the lookup.
 
-- `"m:m"`: duplicates allowed on both sides. Rarely what we want; exists as an explicit opt-in for intentional Cartesian products per key.
+- `"n:m"`: duplicates allowed on both sides. Rarely what we want; exists as an explicit opt-in for intentional Cartesian products per key.
 
 To detect the actual cardinality without enforcing anything:
 
@@ -412,7 +412,7 @@ To detect the actual cardinality without enforcing anything:
 detect_cardinality(sensors, readings_dup, by = "sensor_id")
 ```
 
-This returns a string like `"1:m"` that we can use programmatically, e.g. to select the right `expect` value or to log the cardinality for monitoring.
+This returns a string like `"1:n"` that we can use programmatically, e.g. to select the right `expect` value or to log the cardinality for monitoring.
 
 ## Advanced Features
 

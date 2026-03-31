@@ -9,7 +9,7 @@ join_strict(
   y,
   by,
   type = c("left", "right", "inner", "full"),
-  expect = c("1:1", "1:m", "1:many", "m:1", "many:1", "m:m", "many:many"),
+  expect = c("1:1", "1:n", "1:many", "n:1", "many:1", "n:m", "many:many"),
   backend = NULL,
   ...
 )
@@ -27,11 +27,11 @@ join_strict(
 \item{expect}{Character. The expected cardinality relationship. One of:
 \describe{
 \item{"1:1"}{Each key in x matches at most one key in y, and vice versa}
-\item{"1:m" or "1:many"}{Each key in x can match multiple keys in y,
+\item{"1:n" or "1:many"}{Each key in x can match multiple keys in y,
 but each key in y matches at most one key in x}
-\item{"m:1" or "many:1"}{Each key in y can match multiple keys in x,
+\item{"n:1" or "many:1"}{Each key in y can match multiple keys in x,
 but each key in x matches at most one key in y}
-\item{"m:m" or "many:many"}{No cardinality constraints (allows all relationships)}
+\item{"n:m" or "many:many"}{No cardinality constraints (allows all relationships)}
 }}
 
 \item{backend}{Character or \code{NULL}. The join backend to use. If \code{NULL}

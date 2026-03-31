@@ -210,7 +210,7 @@ analyze_join_chain <- function(tables, joins) {
 #' @param y A data frame (right table).
 #' @param by Column names to join by.
 #'
-#' @return Character string: "1:1", "1:m", "m:1", or "m:m".
+#' @return Character string: "1:1", "1:n", "n:1", or "n:m".
 #'
 #' @examples
 #' # 1:1 relationship
@@ -218,7 +218,7 @@ analyze_join_chain <- function(tables, joins) {
 #' y <- data.frame(id = 1:3, name = c("A", "B", "C"))
 #' detect_cardinality(x, y, "id")
 #'
-#' # 1:m relationship
+#' # 1:n relationship
 #' x <- data.frame(id = 1:3, val = 1:3)
 #' y <- data.frame(id = c(1, 1, 2, 3), name = c("A1", "A2", "B", "C"))
 #' detect_cardinality(x, y, "id")
@@ -240,11 +240,11 @@ detect_cardinality <- function(x, y, by) {
   y_has_dups <- y_summary$n_duplicates > 0
 
   cardinality <- if (x_has_dups && y_has_dups) {
-    "m:m"
+    "n:m"
   } else if (x_has_dups) {
-    "m:1"
+    "n:1"
   } else if (y_has_dups) {
-    "1:m"
+    "1:n"
   } else {
     "1:1"
   }

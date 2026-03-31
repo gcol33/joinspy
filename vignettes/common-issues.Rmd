@@ -394,7 +394,7 @@ If we expected a one-to-many relationship, `join_strict()` will stop us
 before the explosion happens:
 
 ```{r error = TRUE}
-join_strict(items, payments, by = "order_id", type = "left", expect = "1:m")
+join_strict(items, payments, by = "order_id", type = "left", expect = "1:n")
 ```
 
 ## No matches at all

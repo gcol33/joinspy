@@ -129,20 +129,20 @@ test_that("detect_cardinality correctly identifies relationships", {
   y1 <- data.frame(id = 1:3, name = c("A", "B", "C"))
   expect_equal(detect_cardinality(x1, y1, "id"), "1:1")
 
-  # 1:m
+  # 1:n
   x2 <- data.frame(id = 1:3, val = 1:3)
   y2 <- data.frame(id = c(1, 1, 2, 3), name = c("A1", "A2", "B", "C"))
-  expect_equal(detect_cardinality(x2, y2, "id"), "1:m")
+  expect_equal(detect_cardinality(x2, y2, "id"), "1:n")
 
-  # m:1
+  # n:1
   x3 <- data.frame(id = c(1, 1, 2, 3), val = 1:4)
   y3 <- data.frame(id = 1:3, name = c("A", "B", "C"))
-  expect_equal(detect_cardinality(x3, y3, "id"), "m:1")
+  expect_equal(detect_cardinality(x3, y3, "id"), "n:1")
 
-  # m:m
+  # n:m
   x4 <- data.frame(id = c(1, 1, 2), val = 1:3)
   y4 <- data.frame(id = c(1, 2, 2), name = c("A", "B1", "B2"))
-  expect_equal(detect_cardinality(x4, y4, "id"), "m:m")
+  expect_equal(detect_cardinality(x4, y4, "id"), "n:m")
 })
 
 test_that("analyze_join_chain works with multiple tables", {

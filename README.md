@@ -106,7 +106,7 @@ join_explain(result, orders, customers, by = "id", type = "left")
 
 ## Also Includes
 
-The package ships join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) that run diagnostics before joining and attach the report as an attribute. `join_strict()` enforces cardinality (`1:1`, `1:m`, `m:1`, `m:m`) and errors on violation. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences.
+The package ships join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) that run diagnostics before joining and attach the report as an attribute. `join_strict()` enforces cardinality (`1:1`, `1:n`, `n:1`, `n:m`) and errors on violation. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences.
 
 Joins work with tibbles, data.tables, and plain data frames.
 

@@ -63,7 +63,7 @@
 ## Advanced Join Patterns
 
 - **`check_cartesian()`**: Detect and warn about cross-join / Cartesian product explosions
-- **`detect_cardinality()`**: Determine actual key relationship (1:1, 1:m, m:1, m:m)
+- **`detect_cardinality()`**: Determine actual key relationship (1:1, 1:n, n:1, n:m)
 - **`analyze_join_chain()`**: Analyze cascading joins in multi-table workflows
 
 ---
@@ -147,7 +147,7 @@ Initial release.
 - Case mismatch detection
 - Encoding issue detection (UTF-8 vs Latin-1, invisible Unicode)
 - NA key detection
-- Cardinality analysis (1:1, 1:many, many:1, many:many)
+- Cardinality analysis (1:1, 1:n, n:1, n:m)
 
 ## S3 Methods
 

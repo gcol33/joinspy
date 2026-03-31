@@ -14,7 +14,7 @@ detect_cardinality(x, y, by)
 \item{by}{Column names to join by.}
 }
 \value{
-Character string: "1:1", "1:m", "m:1", or "m:m".
+Character string: "1:1", "1:n", "n:1", or "n:m".
 }
 \description{
 Determines the actual cardinality relationship between two tables.
@@ -25,7 +25,7 @@ x <- data.frame(id = 1:3, val = 1:3)
 y <- data.frame(id = 1:3, name = c("A", "B", "C"))
 detect_cardinality(x, y, "id")
 
-# 1:m relationship
+# 1:n relationship
 x <- data.frame(id = 1:3, val = 1:3)
 y <- data.frame(id = c(1, 1, 2, 3), name = c("A1", "A2", "B", "C"))
 detect_cardinality(x, y, "id")

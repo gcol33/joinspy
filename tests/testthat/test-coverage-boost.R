@@ -444,28 +444,28 @@ test_that("detect_cardinality edge cases", {
   expect_equal(result, "1:1")
 })
 
-test_that("detect_cardinality m:1", {
+test_that("detect_cardinality n:1", {
   x <- data.frame(id = c(1, 1, 2), val = 1:3)
   y <- data.frame(id = 1:2, name = letters[1:2])
 
   result <- detect_cardinality(x, y, by = "id")
-  expect_equal(result, "m:1")
+  expect_equal(result, "n:1")
 })
 
-test_that("detect_cardinality 1:m", {
+test_that("detect_cardinality 1:n", {
   x <- data.frame(id = 1:2, val = 1:2)
   y <- data.frame(id = c(1, 1, 2), name = letters[1:3])
 
   result <- detect_cardinality(x, y, by = "id")
-  expect_equal(result, "1:m")
+  expect_equal(result, "1:n")
 })
 
-test_that("detect_cardinality m:m", {
+test_that("detect_cardinality n:m", {
   x <- data.frame(id = c(1, 1, 2), val = 1:3)
   y <- data.frame(id = c(1, 1, 2), name = letters[1:3])
 
   result <- detect_cardinality(x, y, by = "id")
-  expect_equal(result, "m:m")
+  expect_equal(result, "n:m")
 })
 
 test_that("check_cartesian detects explosion", {
@@ -747,11 +747,11 @@ test_that("join_strict fails on violated constraint", {
   expect_error(join_strict(x, y, by = "id", expect = "1:1"), "Cardinality")
 })
 
-test_that("join_strict 1:m passes", {
+test_that("join_strict 1:n passes", {
   x <- data.frame(id = 1:2, val = 1:2)
   y <- data.frame(id = c(1, 1, 2), name = letters[1:3])
 
-  result <- join_strict(x, y, by = "id", expect = "1:m")
+  result <- join_strict(x, y, by = "id", expect = "1:n")
   expect_true(nrow(result) >= 2)
 })
 
@@ -954,19 +954,19 @@ test_that("suggest_repairs with case mismatch", {
   expect_true(length(suggestions) > 0 || is.character(suggestions))
 })
 
-test_that("join_strict m:1 passes", {
+test_that("join_strict n:1 passes", {
   x <- data.frame(id = c(1, 1, 2), val = 1:3)
   y <- data.frame(id = 1:2, name = letters[1:2])
 
-  result <- join_strict(x, y, by = "id", expect = "m:1")
+  result <- join_strict(x, y, by = "id", expect = "n:1")
   expect_true(nrow(result) >= 2)
 })
 
-test_that("join_strict m:m passes", {
+test_that("join_strict n:m passes", {
   x <- data.frame(id = c(1, 1, 2), val = 1:3)
   y <- data.frame(id = c(1, 1, 2), name = letters[1:3])
 
-  result <- join_strict(x, y, by = "id", expect = "m:m")
+  result <- join_strict(x, y, by = "id", expect = "n:m")
   expect_true(nrow(result) >= 2)
 })
 

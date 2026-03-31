@@ -189,7 +189,7 @@ result <- join_strict(
   products, line_items,
   by = "product_id",
   type = "left",
-  expect = "1:m"
+  expect = "1:n"
 )
 nrow(result)
 ```
@@ -208,7 +208,7 @@ join_strict(
   products_bad, line_items,
   by = "product_id",
   type = "left",
-  expect = "1:m"
+  expect = "1:n"
 )
 ```
 
@@ -216,21 +216,21 @@ The four cardinality levels:
 
 - **1:1** -- lookup to lookup. Each key appears exactly once on both sides.
 
-- **1:m** -- reference on the left, transactions on the right (products to
+- **1:n** -- reference on the left, transactions on the right (products to
   line items, stations to hourly readings).
-- **m:1** -- transactions on the left, lookup on the right (sales joined to a
+- **n:1** -- transactions on the left, lookup on the right (sales joined to a
   region table).
-- **m:m** -- duplicates on both sides. Almost always a bug; requiring an
-  explicit `expect = "m:m"` acts as a speed bump.
+- **n:m** -- duplicates on both sides. Almost always a bug; requiring an
+  explicit `expect = "n:m"` acts as a speed bump.
 
-In practice, `"1:m"` and `"m:1"` cover most production joins.
+In practice, `"1:n"` and `"n:1"` cover most production joins.
 `detect_cardinality()` confirms the relationship during development; the
 `expect` value is then hard-coded in the production script.
 
 `check_cartesian()` solves a different problem: it warns about Cartesian
 product explosion when a key has many duplicates on *both* sides. A join can
 violate a `"1:1"` constraint without triggering a Cartesian explosion (one
-extra duplicate is enough), and a `"m:m"` join can produce a massive product
+extra duplicate is enough), and a `"n:m"` join can produce a massive product
 that `join_strict()` would allow. The two functions complement each other.
 
 ## Logging and Audit Trails
@@ -387,10 +387,10 @@ if (!keys_ok) {
 
 # --- Gate 2: cardinality check ---
 card <- detect_cardinality(orders, customers, by = "customer_id")
-if (card == "m:m") {
+if (card == "n:m") {
   set_log_file(NULL)
   unlink(pipeline_log)
-  stop("Unexpected m:m cardinality in orders-customers join", call. = FALSE)
+  stop("Unexpected n:m cardinality in orders-customers join", call. = FALSE)
 }
 
 # --- Join (with auto-logging via *_join_spy) ---
