@@ -33,7 +33,7 @@ Most join failures come down to string-level problems in keys:
 - `"Johansson"` vs `"Johannson"` (one character off)
 - Empty strings matching each other but not `NA`
 
-No errors, no warnings. Rows drop, and you find out three pipeline stages later when a dashboard goes blank.
+R won't warn you about any of these. `join_spy()` catches them before the join runs.
 
 ## What joinspy Does
 
