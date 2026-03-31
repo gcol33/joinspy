@@ -152,7 +152,7 @@ click_events <- data.frame(
 The team writes a simple inner join and gets zero rows back. Zero. Not "fewer
 than expected": literally nothing. At first they suspect the data did not
 load correctly, but both tables have the right number of rows and the columns
-are there. The problem is simpler and more frustrating: R's string comparison
+are there. The explanation is straightforward: R's string comparison
 is case-sensitive, and `"ALICE@ACME.COM"` does not equal `"alice@acme.com"`.
 Every single key pair fails to match, even though the underlying email
 addresses are obviously the same.

@@ -125,7 +125,7 @@ recover most of the lost matches.
 
 ### Encoding and Invisible Characters
 
-Encoding issues are the nastiest. Nothing visible to debug. Two strings render identically in the console but differ at the byte level: a non-breaking space (`\u00A0`) versus a regular space, a Latin-1 accented character versus its UTF-8 equivalent.
+Encoding issues are harder to spot than whitespace or case. Two strings render identically in the console but differ at the byte level: a non-breaking space (`\u00A0`) versus a regular space, a Latin-1 accented character versus its UTF-8 equivalent.
 
 ```{r}
 # Simulate invisible character contamination
@@ -486,7 +486,7 @@ pipeline code have executed.
 
 `join_strict()` performs a join that throws an error if the key relationship
 violates your expectation. This is useful as a guard in production scripts
-where a surprise many-to-many relationship would corrupt downstream results.
+where an unexpected many-to-many would multiply rows.
 
 ```{r}
 sensors <- data.frame(

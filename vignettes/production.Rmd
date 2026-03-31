@@ -19,18 +19,14 @@ knitr::opts_chunk$set(
 library(joinspy)
 ```
 
-Interactive analysis and production scripts have different failure modes. When
-you explore data at the console, a bad join is annoying but recoverable: you
-see the wrong row count, swear, fix the key, and re-run. In a scheduled script
-that feeds a dashboard or triggers downstream jobs, that same bad join silently
-corrupts everything it touches. Nobody notices until a stakeholder files a
-ticket three weeks later.
+Interactive analysis and production scripts have different needs. At the
+console, you see the wrong row count, fix the key, and re-run. In a scheduled
+script, the same issue goes unnoticed until someone looks at the output.
 
-joinspy was built with both contexts in mind, but this vignette focuses
-exclusively on the second one: wiring joinspy into automated pipelines so
-that join problems surface as errors or log entries rather than silent data
-corruption. Every example here uses synthetic data and `tempfile()` paths, so
-you can run the vignette end to end without touching your filesystem.
+This vignette covers wiring joinspy into automated pipelines so that join
+problems surface as errors or log entries. Every example here uses synthetic
+data and `tempfile()` paths, so you can run it end to end without touching
+your filesystem.
 
 ## Assertions with key_check()
 
@@ -532,5 +528,5 @@ to the `join_spy()` calls if the diagnostics become the bottleneck.
 
 The alternative to all of this is trust. Trust that the upstream data is clean,
 trust that the ETL did not introduce duplicates, trust that the key columns
-still match. Trust works until it does not, and when it breaks, the cost is
-always higher than the cost of the checks would have been.
+still match. The checks add a few milliseconds per join; skipping them saves
+nothing if the data changes.

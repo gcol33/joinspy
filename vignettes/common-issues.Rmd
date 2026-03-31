@@ -21,12 +21,11 @@ library(joinspy)
 
 Most join bugs are not about cardinality. They are about strings. A trailing
 space, a flipped case, a zero-width Unicode character: any of these will cause
-two keys that *look* identical to fail matching silently. The result is missing
-rows, and you blame the data when the real culprit is invisible.
+two keys that *look* identical to fail matching without a warning from R.
 
-This vignette walks through the problems joinspy was built to catch, ordered by
-how often they actually cause grief. String-level issues come first because
-they account for the majority of "why did my join drop rows?" questions.
+This vignette walks through the problems joinspy catches, ordered by
+frequency. String-level issues come first because they account for the
+majority of "why did my join drop rows?" questions.
 Structural issues (duplicates, NAs, type mismatches, Cartesian explosions)
 follow.
 
@@ -145,9 +144,9 @@ columns; otherwise you risk silently merging distinct factor levels.
 
 ## Encoding and invisible characters
 
-This one is genuinely nasty. A key contains a non-breaking space (U+00A0)
-instead of a regular space, or a zero-width joiner crept in during a
-copy-paste from a PDF. The strings print identically. They do not match.
+A key contains a non-breaking space (U+00A0) instead of a regular space, or
+a zero-width joiner crept in during a copy-paste from a PDF. The strings
+print identically. They do not match.
 
 ```{r}
 # Simulate a non-breaking space in one key
@@ -450,14 +449,11 @@ check_cartesian(items, payments, by = "order_id")
 detect_cardinality(items, payments, by = "order_id")
 ```
 
-In production pipelines, m:m explosions are dangerous beyond the obvious memory
-cost. A 50,000-row table joined against a 30,000-row table with moderate
-duplication can silently produce tens of millions of rows. Downstream
-aggregations (sums, means, counts) then operate on the inflated table and
-return wrong numbers; the results look plausible, so nobody catches the error
-until a business decision has already been made. Even if memory is not a
-constraint, the arithmetic is wrong because observations are counted multiple
-times.
+In production, m:m joins are a common source of wrong aggregations. A
+50,000-row table joined against a 30,000-row table with moderate duplication
+can produce tens of millions of rows. Downstream sums, means, and counts then
+operate on the inflated table and return incorrect numbers, because
+observations are counted multiple times.
 
 If you expected a one-to-many relationship, `join_strict()` will stop you
 before the explosion happens:
@@ -468,11 +464,9 @@ join_strict(items, payments, by = "order_id", type = "left", expect = "1:m")
 
 ## No matches at all
 
-Your inner join returns zero rows. This is the most alarming failure mode because
-the result is an empty data frame, which propagates silently through downstream
-code until something visibly breaks (an empty plot, a division by zero in a
-summary statistic). Before you question your sanity, check whether the keys even
-overlap:
+Your inner join returns zero rows. The result is an empty data frame, which
+downstream code may not check for. The first thing to verify is whether the
+keys overlap at all:
 
 ```{r}
 system_a <- data.frame(
