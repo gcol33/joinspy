@@ -35,9 +35,7 @@ When you call `left_join_spy()` or `join_strict()` without specifying a
 backend, joinspy inspects the class of `x` and `y` and picks the backend
 according to a fixed priority:
 
-1. If either input inherits from `data.table`, use data.table. Otherwise, if either input inherits from `tbl_df` (tibble), use dplyr.
-
-2. If neither condition holds, use base R `merge()`.
+1. If either input inherits from `data.table`, use data.table; if either inherits from `tbl_df` (tibble), use dplyr; otherwise fall back to base R `merge()`.
 
 data.table wins over tibble because data.table's merge implementation has
 specific expectations about key handling and indexing that cannot be replicated
