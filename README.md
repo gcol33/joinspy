@@ -104,11 +104,23 @@ join_explain(result, orders, customers, by = "id", type = "left")
 #> ! 3 left key(s) have no match in right table
 ```
 
+### Enforce
+
+`join_strict()` performs the join and enforces the cardinality you declare. If the data has a `1:n` relationship and you said `1:1`, it errors before producing a result. The output row count is determined by the constraint, not discovered after the fact.
+
+```r
+# Declare 1:1 — errors if any key is duplicated on either side
+join_strict(orders, customers, by = "id", expect = "1:1")
+
+# Declare 1:n — left keys must be unique, right may repeat
+join_strict(products, line_items, by = "product_id", expect = "1:n")
+```
+
+The four levels are `"1:1"`, `"1:n"`, `"n:1"`, and `"n:m"`. `detect_cardinality()` reports the actual relationship if you need to check first.
+
 ## Also Includes
 
-The package ships join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) that run diagnostics before joining and attach the report as an attribute. `join_strict()` enforces cardinality (`1:1`, `1:n`, `n:1`, `n:m`) and errors on violation. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences.
-
-Joins work with tibbles, data.tables, and plain data frames.
+Join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) run diagnostics before joining and attach the report as an attribute. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences. All joins work with tibbles, data.tables, and plain data frames.
 
 ## Installation
 

@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 library(joinspy)
 ```
 
-joinspy diagnoses join keys and performs joins with cardinality enforcement. It surfaces the string-level problems that prevent keys from matching (whitespace, case, encoding, typos), offers one-call repair, and provides join wrappers where you specify the expected cardinality (`1:1`, `1:n`, `n:1`, `n:m`). Works with base R, dplyr, and data.table.
+joinspy diagnoses join keys and performs joins with cardinality enforcement. It surfaces the string-level problems that prevent keys from matching (whitespace, case, encoding, typos) and offers one-call repair. `join_strict()` lets you declare the expected cardinality (`1:1`, `1:n`, `n:1`, `n:m`) and errors if the data violates it — the output row count is predictable by construction. Works with base R, dplyr, and data.table.
 
 ## String Diagnostics
 
@@ -366,7 +366,7 @@ rpt$match_analysis$match_rate
 
 ## Cardinality Enforcement
 
-`join_strict()` performs a join that errors if the key relationship violates a stated expectation. This is a guard against unexpected many-to-many joins that multiply rows.
+Every join has an intended cardinality: a lookup table is `1:n`, a one-to-one mapping is `1:1`. `join_strict()` lets you declare that relationship. If the data violates it, the join errors instead of producing a wrong-sized result. The output row count is determined by the constraint you specify.
 
 ```{r}
 sensors <- data.frame(

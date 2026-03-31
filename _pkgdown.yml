@@ -23,8 +23,6 @@ navbar:
     articles:
       text: Articles
       menu:
-      - text: Quick Start
-        href: articles/quickstart.html
       - text: Why Your Keys Don't Match
         href: articles/why-keys-dont-match.html
       - text: Common Join Problems
