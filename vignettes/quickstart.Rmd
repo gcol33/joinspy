@@ -23,7 +23,7 @@ joinspy diagnoses join keys before you join. It surfaces the string-level proble
 
 ## String Diagnostics
 
-Most failed joins are not caused by missing data. They fail because the keys *look* identical but differ at the byte level: a trailing space, a case mismatch, an invisible Unicode character. `str()` and `summary()` won't reveal these.
+The keys *look* identical but differ at the byte level: a trailing space, a case mismatch, an invisible Unicode character. These differences don't show up in `str()` or `summary()` output, but they determine whether a join matches.
 
 ### Whitespace
 

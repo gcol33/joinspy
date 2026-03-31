@@ -19,15 +19,14 @@ knitr::opts_chunk$set(
 library(joinspy)
 ```
 
-A join runs without error but the row count is off -- rows vanished, or they
-multiplied. The columns look fine. The key values look identical in the
-console. `str()` reveals nothing useful.
+A join runs without error but the row count is wrong -- fewer rows than
+expected, or more. The columns look fine. The key values look identical in
+the console.
 
-The problem is almost never the join logic. It is the strings. R's `merge()`
-and dplyr's `*_join()` compare key values byte-for-byte. When keys fail to
-match, they are genuinely different -- the difference is just invisible: a
-trailing space, a case mismatch, a zero-width Unicode character with no
-visual representation.
+R's `merge()` and dplyr's `*_join()` compare key values byte-for-byte. When
+keys fail to match, they are genuinely different at the byte level: a
+trailing space, a case mismatch, or a zero-width Unicode character that
+occupies no screen width.
 
 This vignette walks through five scenarios where joins fail for string-level
 reasons that resist casual inspection. The data is synthetic; the patterns
@@ -187,8 +186,8 @@ pdf_data$country
 
 The zero-width space after "India" and "France" occupies zero pixels. The
 non-breaking space after "Japan" renders like a regular space but is U+00A0,
-not U+0020 -- `trimws()` will not always remove it. The merge shows the
-damage:
+not U+0020 -- `trimws()` will not always remove it. The merge reflects
+this:
 
 ```{r}
 nrow(merge(pdf_data, reference, by = "country"))
@@ -244,8 +243,8 @@ transactions <- data.frame(
 )
 ```
 
-The damage is partial -- some codes match, some do not -- which makes it
-harder to spot than a complete failure.
+Some codes match and some do not, which makes partial failures harder to
+spot than complete ones.
 
 ```{r}
 report <- join_spy(transactions, catalogue, by = "product_code")
@@ -293,7 +292,7 @@ transformations (trimming, case normalization, stripping invisible
 characters). Inserting a dash into `"WDG102"` requires knowing the canonical
 format -- that fix has to come from someone who understands the data.
 
-## Scenario 5: The Compound Key Trap
+## Scenario 5: Compound Keys
 
 Two government datasets need to be linked: regional economic indicators and
 regional population estimates, keyed on region and year. The year column is
@@ -327,9 +326,8 @@ merged <- merge(economics, population, by = c("region", "year"))
 nrow(merged)
 ```
 
-Four rows instead of six. North America and Europe link correctly; Asia
-Pacific silently vanishes. Two-thirds of the data is present -- just enough to
-look plausible.
+Four rows instead of six. North America and Europe match; Asia Pacific does
+not, because of the trailing space.
 
 `join_spy()` pinpoints which column in the compound key has the problem:
 
@@ -343,20 +341,19 @@ result <- merge(repaired$x, repaired$y, by = c("region", "year"))
 nrow(result)
 ```
 
-Six rows. Compound keys are more fragile than single keys because the failure
-is partial: one clean column and one dirty column produces a result that looks
-reasonable but is quietly incomplete. The more columns in the key, the more
-places an invisible character can hide.
+Six rows. With compound keys, a string issue in any single column is enough
+to break the match. The more columns in the key, the more places a
+byte-level discrepancy can occur.
 
 ## The Pattern
 
 These five scenarios share three properties. The data looks correct to
 standard inspection tools -- `str()`, `summary()`, `print()` all render the
-values identically. The failure is silent -- R does not warn when a merge
-drops rows because of invisible whitespace; it just returns fewer rows. And
-the fix is mechanical once the cause is known -- trimming, lowercasing, or
-stripping invisible Unicode are all one-line operations.
+values identically. R returns fewer (or more) rows without a warning, because
+the key values genuinely differ at the byte level. And the fix is mechanical
+once the cause is known -- trimming, lowercasing, or stripping invisible
+Unicode are all one-line operations.
 
-`join_spy()` closes the gap between a thirty-second fix and the hours of
-confusion that precede it, particularly with data from external sources,
-manual entry, PDF extraction, or cross-system integrations.
+`join_spy()` surfaces the cause directly, which is especially useful with
+data from external sources, manual entry, PDF extraction, or cross-system
+integrations.

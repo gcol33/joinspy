@@ -19,13 +19,12 @@ knitr::opts_chunk$set(
 library(joinspy)
 ```
 
-Most join bugs are not about cardinality. They are about strings. A trailing
-space, a flipped case, a zero-width Unicode character: any of these will cause
-two keys that *look* identical to fail matching without a warning from R.
+Trailing spaces, flipped case, and zero-width Unicode characters make keys
+that look identical on screen compare as different during a join.
 
-We will walk through the problems joinspy catches, ordered roughly by
-frequency. String-level issues come first, then structural issues (duplicates,
-NAs, type mismatches, Cartesian explosions).
+This vignette covers the issues joinspy detects, ordered roughly by frequency.
+String-level issues come first, then structural ones (duplicates, NAs, type
+mismatches, Cartesian explosions).
 
 ## Trailing and leading whitespace
 
