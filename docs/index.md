@@ -151,7 +151,7 @@ Joins work with tibbles, data.tables, and plain data frames.
 install.packages("joinspy")
 
 # Or install development version from GitHub
-# install.packages("pak")
+install.packages("pak")
 pak::pak("gcol33/joinspy")
 ```
 

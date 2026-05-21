@@ -129,7 +129,7 @@ Join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) run diagnostics befo
 install.packages("joinspy")
 
 # Or install development version from GitHub
-# install.packages("pak")
+install.packages("pak")
 pak::pak("gcol33/joinspy")
 ```
 
