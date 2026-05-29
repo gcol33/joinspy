@@ -1,5 +1,7 @@
 # joinspy
 
+*the keys look fine to you*
+
 [![CRAN status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
 [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/joinspy)](https://cran.r-project.org/package=joinspy)
 [![Monthly downloads](https://cranlogs.r-pkg.org/badges/joinspy)](https://cran.r-project.org/package=joinspy)
@@ -7,49 +9,35 @@
 [![Codecov test coverage](https://codecov.io/gh/gcol33/joinspy/graph/badge.svg)](https://app.codecov.io/gh/gcol33/joinspy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Find out why your keys don't match.**
+**Diagnoses join keys at the character level before the join runs, then repairs them.**
 
-You ran a left join and lost 40% of your rows. dplyr says "many-to-many relationship." joinspy says 12 keys have trailing spaces, 8 differ only by case, and 3 contain invisible Unicode characters. Then it fixes them.
-
-## Quick Start
+Most join failures come down to keys that look identical but aren't: a trailing
+space, a stray uppercase letter, a zero-width Unicode character. R compares the
+raw bytes and reports a clean miss. `join_spy()` inspects the key columns first,
+names the exact values that won't match and why, predicts the result size for
+each join type, and hands you the code to fix them.
 
 ```r
 library(joinspy)
 
+# inspect the keys before joining
 join_spy(orders, customers, by = "customer_id")
 
+# fix whitespace, case, and invisible characters
 repaired <- join_repair(orders, customers, by = "customer_id")
-
-suggest_repairs(join_spy(orders, customers, by = "customer_id"))
 ```
 
-## The Problem
-
-Most join failures come down to string-level problems in keys:
-
-- `"Alice"` vs `"Alice "` (trailing space, invisible)
-- `"NYC"` vs `"nyc"` (case)
-- Zero-width spaces, BOMs, non-breaking spaces that look like regular spaces but aren't
-- `"Johansson"` vs `"Johannson"` (one character off)
-- Empty strings matching each other but not `NA`
-
-R won't warn you about any of these. `join_spy()` catches them before the join runs.
-
-## What joinspy Does
-
-### Diagnose
-
-`join_spy()` examines keys before the join:
+## What the diagnostic catches
 
 ```r
 orders <- data.frame(
-  id = c("A", "B ", "c", "D"),
+  id     = c("A", "B ", "c", "D"),
   amount = c(100, 200, 300, 400),
   stringsAsFactors = FALSE
 )
 
 customers <- data.frame(
-  id = c("A", "B", "C", "E"),
+  id   = c("A", "B", "C", "E"),
   name = c("Alice", "Bob", "Carol", "Eve"),
   stringsAsFactors = FALSE
 )
@@ -64,9 +52,17 @@ join_spy(orders, customers, by = "id")
 #>   x "D" has no match in right table
 ```
 
-### Repair
+Each key column is checked for leading and trailing whitespace, case-only
+differences between the two tables, invisible Unicode (zero-width spaces, BOMs,
+non-breaking spaces), mixed encodings, empty strings that match each other but
+not `NA`, type and factor-level mismatches, floating-point keys that compare
+unequal, and near-matches within a Levenshtein distance of two for likely typos.
 
-`join_repair()` fixes the issues, or previews what it would change with `dry_run = TRUE`. `suggest_repairs()` prints the R code instead of running it.
+## Repair
+
+`join_repair()` applies the fixes; `dry_run = TRUE` previews them without
+touching the data, and `suggest_repairs()` prints the R code instead of running
+it, so you can paste it into a script you control.
 
 ```r
 join_repair(orders, customers, by = "id", dry_run = TRUE)
@@ -80,9 +76,10 @@ suggest_repairs(join_spy(orders, customers, by = "id"))
 #> y$id <- toupper(y$id)
 ```
 
-### Predict
+## Predicting result size
 
-`join_spy()` also estimates result size for each join type:
+A report also estimates the row count for each join type from the key
+multiplicities, so a row explosion is visible before it happens:
 
 ```r
 report <- join_spy(orders, customers, by = "id")
@@ -93,9 +90,25 @@ report$expected_rows
 #> full_join:  7
 ```
 
-### Explain
+## Enforcing cardinality
 
-`join_explain()` works after the join, on the result:
+`join_strict()` performs the join and holds it to the relationship you declare.
+Declare `1:1` and it errors if any key is duplicated on either side, before
+producing a result. The output row count follows from the constraint rather than
+being discovered afterward.
+
+```r
+# left keys must be unique, right may repeat
+join_strict(products, line_items, by = "product_id", expect = "1:n")
+```
+
+The levels are `"1:1"`, `"1:n"`, `"n:1"`, and `"n:m"`. `detect_cardinality()`
+reports the actual relationship if you want to check first.
+
+## Explaining a join that already ran
+
+`join_explain()` works on the result, accounting for the row count against the
+two inputs:
 
 ```r
 result <- merge(orders, customers, by = "id", all.x = TRUE)
@@ -104,32 +117,21 @@ join_explain(result, orders, customers, by = "id", type = "left")
 #> ! 3 left key(s) have no match in right table
 ```
 
-### Enforce
+## Drop-in join wrappers
 
-`join_strict()` performs the join and enforces the cardinality you declare. If the data has a `1:n` relationship and you said `1:1`, it errors before producing a result. The output row count is determined by the constraint, not discovered after the fact.
-
-```r
-# Declare 1:1 — errors if any key is duplicated on either side
-join_strict(orders, customers, by = "id", expect = "1:1")
-
-# Declare 1:n — left keys must be unique, right may repeat
-join_strict(products, line_items, by = "product_id", expect = "1:n")
-```
-
-The four levels are `"1:1"`, `"1:n"`, `"n:1"`, and `"n:m"`. `detect_cardinality()` reports the actual relationship if you need to check first.
-
-## Also Includes
-
-Join wrappers (`left_join_spy()`, `inner_join_spy()`, etc.) run diagnostics before joining and attach the report as an attribute. `check_cartesian()` flags many-to-many keys that would multiply your row count. `analyze_join_chain()` handles multi-step A-B-C sequences. All joins work with tibbles, data.tables, and plain data frames.
+`left_join_spy()`, `inner_join_spy()`, and the rest run the diagnostic, perform
+the join, and attach the report as an attribute. `check_cartesian()` flags
+many-to-many keys that would multiply the row count, and `analyze_join_chain()`
+traces a multi-step A-B-C sequence. Inputs dispatch to their native engine:
+tibbles use dplyr, data.tables use data.table, plain data frames use base
+`merge()`, and the class survives the diagnose-repair-join cycle.
 
 ## Installation
 
 ```r
-# Install from CRAN
-install.packages("joinspy")
+install.packages("joinspy")            # CRAN
 
-# Or install development version from GitHub
-install.packages("pak")
+install.packages("pak")                # development version
 pak::pak("gcol33/joinspy")
 ```
 
@@ -142,16 +144,18 @@ pak::pak("gcol33/joinspy")
 - [Working with Backends](https://gillescolling.com/joinspy/articles/backends.html)
 - [Function Reference](https://gillescolling.com/joinspy/reference/index.html)
 
-## Related Work
+## Related work
 
 | Package | Focus |
 |---------|-------|
 | [dplyr](https://dplyr.tidyverse.org/) 1.1+ | Cardinality checks via `relationship` argument |
-| [powerjoin](https://github.com/moodymudskipper/powerjoin) | 12-level configurable checks, key preprocessing |
-| [joyn](https://github.com/randrescastaneda/joyn) | Match-status reporting variable per row |
+| [powerjoin](https://github.com/moodymudskipper/powerjoin) | Configurable join checks and key preprocessing |
+| [joyn](https://github.com/randrescastaneda/joyn) | Per-row match-status reporting variable |
 | [tidylog](https://github.com/elbersb/tidylog) | Logs row count changes after joins |
 
-joinspy focuses on string-level key diagnostics: whitespace, case, encoding, typos, and type mismatches. It identifies which specific keys failed, why, and can fix them automatically.
+`joinspy` works on the keys themselves: whitespace, case, encoding, typos, and
+type mismatches. It points to the specific values that failed, says why, and can
+fix them.
 
 ## Support
 
