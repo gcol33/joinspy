@@ -1,6 +1,6 @@
 # joinspy
 
-*the keys look fine to you*
+*keys that look identical but aren't*
 
 [![CRAN status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
 [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/joinspy)](https://cran.r-project.org/package=joinspy)
