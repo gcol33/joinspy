@@ -1,10 +1,10 @@
 ## Submission
 
-joinspy 0.8.2 is a patch release. It fixes several diagnostic correctness
-bugs (duplicate-key counts in logged reports, NA handling in composite keys,
-integer overflow in row-count predictions, an unimported operator that broke
-the package on R 4.1-4.3) and refactors shared key-handling logic into single
-sources of truth. See NEWS.md for the full list.
+joinspy 0.8.3 is a patch release. It fixes a correctness bug where the safe
+join wrappers modified the caller's data.table in place when the right-hand
+side was a data.table; the input is now copied before renaming. It also lets
+join_explain() infer the join type from row counts when not supplied, and
+expands the vignettes. See NEWS.md for the full list.
 
 ## Test environments
 

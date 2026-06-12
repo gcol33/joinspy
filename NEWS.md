@@ -1,3 +1,17 @@
+# joinspy 0.8.3
+
+## Bug fixes
+
+- Safe join wrappers no longer modify the caller's `data.table`. When the right-hand side was a `data.table`, the key-column rename was applied in place; the input is now copied before renaming so the caller's object is left untouched.
+
+## Improvements
+
+- `join_explain()` infers the join type from row counts when `type` is not supplied, and remains robust when the type cannot be determined unambiguously.
+
+## Documentation
+
+- Expanded the vignettes with additional worked examples and guidance.
+
 # joinspy 0.8.2
 
 ## Bug fixes
