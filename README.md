@@ -1,5 +1,7 @@
 # joinspy
 
+> Small exact engines for scientific computing in R.
+
 *keys that look identical but aren't*
 
 [![CRAN status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
