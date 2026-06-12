@@ -12,7 +12,308 @@ width.
 
 This vignette walks through five scenarios where joins fail for
 string-level reasons that resist casual inspection. The data is
-synthetic; the patterns come from real pipelines.
+synthetic; the patterns come from real pipelines. The first two sections
+cover the mechanics: what R compares when it joins two key columns, and
+which checks
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+runs against them. The scenarios then put both to work.
+
+## What a Join Actually Compares
+
+Every join reduces to the same primitive: for each key in one table,
+find the positions of equal keys in the other.
+[`merge()`](https://rdrr.io/r/base/merge.html) builds on
+[`match()`](https://rdrr.io/r/base/match.html); dplyr and data.table run
+their own join engines and apply the same standard of equality. Two
+character keys are equal when their byte sequences are equal, after R
+translates any declared encodings to a common representation. There is
+no trimming, no case folding, no Unicode normalization along the way. A
+single byte of difference makes two keys strangers.
+
+[`identical()`](https://rdrr.io/r/base/identical.html) applies the same
+standard, which makes it a convenient way to test what a join will see:
+
+``` r
+
+a <- "CUST-1002"
+b <- "CUST-1002 "
+identical(a, b)
+#> [1] FALSE
+c(nchar(a), nchar(b))
+#> [1]  9 10
+```
+
+The strings differ by one character, and
+[`charToRaw()`](https://rdrr.io/r/base/rawConversion.html) shows which
+byte is responsible:
+
+``` r
+
+charToRaw(b)
+#>  [1] 43 55 53 54 2d 31 30 30 32 20
+```
+
+The final `20` is an ordinary space. This one happens to be easy to spot
+once printed as bytes. The characters behind longer debugging sessions
+render as nothing at all, or as something indistinguishable from a
+space. The non-breaking space is the classic example:
+
+``` r
+
+space <- "\u0020"
+nbsp <- "\u00A0"
+space == nbsp
+#> [1] FALSE
+c(utf8ToInt(space), utf8ToInt(nbsp))
+#> [1]  32 160
+```
+
+[`utf8ToInt()`](https://rdrr.io/r/base/utf8Conversion.html) returns the
+Unicode code point of each character, which makes it the most direct
+inspection tool for a suspicious key: 32 is the space on your keyboard,
+160 is the non-breaking space from a web page or a PDF. Both render as a
+gap of the same width.
+
+Two strings can also be visually identical with no invisible characters
+anywhere in them. Unicode allows an accented letter to be written two
+ways: as one precomposed code point, or as a base letter followed by a
+combining accent.
+
+``` r
+
+e_one <- "\u00E9"
+e_two <- "e\u0301"
+e_one
+#> [1] "é"
+e_two
+#> [1] "é"
+e_one == e_two
+#> [1] FALSE
+```
+
+Both print as the same accented e. The first is a single code point, the
+second is two, and R compares the sequences without normalizing them:
+
+``` r
+
+c(nchar(e_one), nchar(e_two))
+#> [1] 1 2
+utf8ToInt(e_one)
+#> [1] 233
+utf8ToInt(e_two)
+#> [1] 101 769
+```
+
+A reference table typed by hand usually carries the precomposed form.
+Data that passed through certain text processors or through macOS file
+paths can arrive decomposed, and a column of city or person names will
+then fail to match a column that looks identical character for
+character.
+
+Encoding adds one more layer. The same character can be stored as
+different bytes depending on the encoding. The umlauted u is one byte in
+latin1 and two bytes in UTF-8:
+
+``` r
+
+city_utf8 <- "Z\u00FCrich"
+city_latin1 <- iconv(city_utf8, from = "UTF-8", to = "latin1")
+c(Encoding(city_utf8), Encoding(city_latin1))
+#> [1] "UTF-8"  "latin1"
+charToRaw(city_utf8)
+#> [1] 5a c3 bc 72 69 63 68
+charToRaw(city_latin1)
+#> [1] 5a fc 72 69 63 68
+```
+
+Different bytes, same declared meaning. As long as the declaration is
+correct, R translates before comparing and the keys still match:
+
+``` r
+
+city_utf8 == city_latin1
+#> [1] TRUE
+```
+
+Trouble starts when bytes and declaration disagree. A latin1 file read
+as if it were UTF-8, or read with no declaration on a system that
+assumes one, produces strings whose bytes no longer mean what R thinks
+they mean. Accented keys then differ from their clean counterparts, and
+nothing in the comparison machinery reconciles them.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+flags key columns that mix declared encodings, since mixed declarations
+within a single column usually mean some values entered the session by a
+different route than the rest.
+
+None of the failures above produce a warning, because none of them are
+errors from R’s point of view. String equality is exact and well
+defined. A join that matches three keys out of six did what it was told,
+and a zero-row inner join is a legitimate result (an anti-join hopes for
+exactly that). [`merge()`](https://rdrr.io/r/base/merge.html) has no way
+to know that six matches were expected. The evidence that something went
+wrong lives in the difference between the rows you expected and the rows
+you got, which is why diagnosing it takes a separate step.
+
+## What join_spy() Scans For
+
+Every scenario below ends with a
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+call, so it is worth laying out what that call checks. Everything
+happens inside the one function and comes back in the printed
+`JoinReport`. The chunks in this section reproduce individual checks
+with base R so the mechanics are visible; none of them are needed in
+normal use.
+
+### Whitespace
+
+Leading and trailing whitespace is detected with anchored regular
+expressions over each character key column:
+
+``` r
+
+ids <- c("CUST-1001", "CUST-1002 ", " CUST-1004")
+grepl("^\\s+", ids)
+#> [1] FALSE FALSE  TRUE
+grepl("\\s+$", ids)
+#> [1] FALSE  TRUE FALSE
+```
+
+Values failing either test are collected and reported with their column
+and table. Interior whitespace is left alone: `"New York"` and
+`"New York"` differ by an interior space and fall to the near-match
+check further down.
+
+### Case
+
+A case mismatch is defined relationally. A key counts only when it has
+no exact match in the other table and would gain one if both sides were
+lowercased:
+
+``` r
+
+crm <- c("ALICE@ACME.COM", "EVE@ACME.COM")
+clicks <- c("alice@acme.com", "frank@acme.com")
+crm[tolower(crm) %in% tolower(clicks)]
+#> [1] "ALICE@ACME.COM"
+```
+
+Eve appears in neither form on the right, so she is a genuinely
+unmatched key; Alice is a case mismatch. The report keeps example pairs,
+which is how the output in Scenario 2 can name the specific addresses
+involved.
+
+### Invisible characters and encodings
+
+The encoding check looks for two conditions: mixed declared encodings
+within one column, read off
+[`Encoding()`](https://rdrr.io/r/base/Encoding.html), and the presence
+of any of five code points that render as nothing or as an
+ordinary-looking space:
+
+``` r
+
+hidden <- "[\u200B\u200C\u200D\uFEFF\u00A0]"
+grepl(hidden, c("India\u200B", "India"), perl = TRUE)
+#> [1]  TRUE FALSE
+```
+
+The watch list is U+200B (zero-width space), U+200C (zero-width
+non-joiner), U+200D (zero-width joiner), U+FEFF (byte order mark), and
+U+00A0 (non-breaking space). U+00A0 earns its place on the list because
+regex whitespace classes and
+[`trimws()`](https://rdrr.io/r/base/trimws.html) treat it inconsistently
+across engines and locales, so a whitespace scan alone cannot be trusted
+to catch it.
+
+### Empty strings
+
+Empty strings sit in a blind spot: they read as missing data to a human
+and as a valid key to a join.
+
+``` r
+
+c("" == "", "" == NA)
+#> [1] TRUE   NA
+```
+
+An empty string equals another empty string, so two tables that both use
+`""` as a placeholder will match those rows to each other. The report
+flags empty keys as informational, and `join_repair(empty_to_na = TRUE)`
+converts them when that match behavior is unwanted.
+
+### Types, factors, and numeric keys
+
+Key columns can also be factors, integers, or doubles, and the type
+checks cover the seams between column types. Character against factor is
+reported as informational, since the join will coerce. Character against
+numeric is reported as a warning, because that coercion is a recurring
+source of surprises. When both sides are factors, their level sets are
+compared and any levels unique to one side are listed. Numeric keys get
+two checks of their own: keys with decimal parts, and keys large enough
+to exhaust double precision.
+
+``` r
+
+0.1 + 0.2 == 0.3
+#> [1] FALSE
+2^53 == 2^53 + 1
+#> [1] TRUE
+```
+
+Both lines are standard floating-point behavior, and both translate
+directly into joins that quietly drop or merge rows: a key computed as
+`0.1 + 0.2` will never find a key stored as `0.3`, and above `2^53`
+distinct integer IDs stop being distinguishable as doubles.
+
+### Duplicates, NAs, and predicted row counts
+
+Separately from string quality,
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+summarizes each table’s keys: rows, unique keys, duplicated keys, NA
+keys. Duplicates matter because each match against a duplicated key
+multiplies rows; NA keys matter because they will not match. From the
+per-key counts the report predicts the result size of all four join
+types. The inner-join figure is the sum, over matched keys, of the
+product of each side’s counts, which is exactly the arithmetic that
+turns a harmless-looking duplicate into a memory problem. The report
+object also carries a heuristic memory estimate per join type for the
+same reason.
+
+### Near matches
+
+Whatever remains unmatched after the exact analysis goes through a typo
+hunt. Unmatched left keys are compared against right keys by Levenshtein
+edit distance, the minimum number of single-character insertions,
+deletions, and substitutions needed to turn one string into the other,
+computed with [`utils::adist()`](https://rdrr.io/r/utils/adist.html):
+
+``` r
+
+utils::adist("WDG102", "WDG-102")
+#>      [,1]
+#> [1,]    1
+utils::adist("Asia Pacific ", "Asia Pacific")
+#>      [,1]
+#> [1,]    1
+```
+
+A pair is reported as a near match when its distance is 1 or 2. Keys
+shorter than three characters are skipped, since nearly everything sits
+within two edits of a string like `"A7"`. A length pre-check discards
+pairs whose lengths already differ by more than two, and to keep the
+scan cheap the comparison covers at most 50 unmatched left keys against
+100 right keys, reporting the 10 closest pairs. Near matches stay
+informational: `"WDG102"` sitting one edit from `"WDG-102"` is strong
+evidence of a typo, and the report points it out without changing
+anything.
+
+### Compound keys
+
+For multi-column keys, an extra pass analyzes each key column on its
+own: unique values per side, matches between them, and a per-column
+match rate. The column with the lowest match rate is called out as the
+likely problem column. Scenario 5 shows what this buys: an overall match
+rate says something is wrong, and the per-column breakdown says where.
 
 ## Scenario 1: The Excel Export
 
@@ -49,6 +350,34 @@ catches it:
 ``` r
 
 report <- join_spy(partner_sales, internal_db, by = "customer_id")
+report
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: customer_id
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 6 Unique keys: 6 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 7 Unique keys: 7 Duplicate keys: 0 NA keys: 0
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 3
+#> Keys only in left: 3
+#> Keys only in right: 4
+#> Match rate (left): "50%"
+#> 
+#> ── Issues Detected ──
+#> 
+#> ! Left column 'customer_id' has 3 value(s) with leading/trailing whitespace
+#> ℹ 10 near-match(es) found (e.g., 'CUST-1002 ' ~ 'CUST-1002', ' CUST-1004' ~ 'CUST-1004', 'CUST-1002 ' ~ 'CUST-1001') - possible typos?
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 3
+#> left_join: 6
+#> right_join: 7
+#> full_join: 10
 ```
 
 Three of the six partner IDs carry whitespace. `"CUST-1002 "` is a
@@ -87,6 +416,17 @@ trailing spaces from a variable-width source column. Excel renders
 Trailing whitespace is the single most common join failure we see in
 practice.
 
+Excel is one of several routes for this defect. SQL `CHAR(n)` columns
+pad values with spaces to a fixed width, and some database drivers
+deliver the padding to R intact. Fixed-width flat files do it by
+construction. Manual entry adds a trailing space whenever someone types
+one before tabbing out of a cell. Every route passes through an
+ingestion point, so the cheapest prevention is to trim key columns once,
+where external data enters the pipeline, and to put a
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+call at that boundary. It would have turned this quarter’s silent 30%
+match drop into a loud failure on the first run.
+
 ## Scenario 2: Two Databases, Two Conventions
 
 A SaaS company wants to join CRM profiles to clickstream events for a
@@ -119,6 +459,33 @@ flags the situation before the join:
 ``` r
 
 report <- join_spy(crm_profiles, click_events, by = "email")
+report
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: email
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 5 Unique keys: 5 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 5 Unique keys: 5 Duplicate keys: 0 NA keys: 0
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 0
+#> Keys only in left: 5
+#> Keys only in right: 5
+#> Match rate (left): "0%"
+#> 
+#> ── Issues Detected ──
+#> 
+#> ! 4 key(s) would match if case-insensitive (e.g., 'ALICE@ACME.COM' vs 'alice@acme.com')
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 0
+#> left_join: 5
+#> right_join: 5
+#> full_join: 10
 ```
 
 [`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
@@ -130,8 +497,8 @@ suggest_repairs(report)
 #> 
 #> ── Suggested Repairs ───────────────────────────────────────────────────────────
 #> # Standardize case:
-#> x$email <- tolower(x$email)
-#> y$email <- tolower(y$email)
+#> x[["email"]] <- tolower(x[["email"]])
+#> y[["email"]] <- tolower(y[["email"]])
 ```
 
 Or we can use
@@ -168,6 +535,18 @@ result
 Email addresses are case-insensitive by RFC 5321, so lowercasing is the
 right normalization here. For other identifier types (product codes,
 country abbreviations), `"upper"` may be more appropriate.
+
+Conventions like these are system-wide and invisible from inside the
+system that holds them. Many database collations compare strings
+case-insensitively, so the CRM’s uppercase migration never broke an
+internal query; the web stack lowercased on write and was just as
+self-consistent. The mismatch exists only at the seam where the two
+systems meet, which is where an R join usually sits. The first join
+between two new sources is the right moment to run
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+and settle the convention question, and spelling the choice out through
+`standardize_case` documents it in code for the next person who touches
+the pipeline.
 
 ## Scenario 3: The PDF Copy-Paste
 
@@ -223,7 +602,39 @@ detects the invisible characters:
 ``` r
 
 report <- join_spy(pdf_data, reference, by = "country")
+report
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: country
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 6 Unique keys: 6 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 7 Unique keys: 7 Duplicate keys: 0 NA keys: 0
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 3
+#> Keys only in left: 3
+#> Keys only in right: 4
+#> Match rate (left): "50%"
+#> 
+#> ── Issues Detected ──
+#> 
+#> ! Left column 'country' has encoding issues (invisible chars or mixed encoding)
+#> ℹ 3 near-match(es) found (e.g., 'India​' ~ 'India', 'Japan ' ~ 'Japan', 'France​' ~ 'France') - possible typos?
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 3
+#> left_join: 6
+#> right_join: 7
+#> full_join: 10
 ```
+
+Alongside the encoding warning, the near-match check reaches the same
+conclusion from a different direction: each contaminated name sits one
+edit away from its clean counterpart in the reference table.
 
 ``` r
 
@@ -239,6 +650,19 @@ can produce them too. One useful debugging trick outside of joinspy:
 `nchar("India\u200B")` returns 6, not 5. But that requires already
 suspecting the problem.
 
+Each watched code point has a typical entry route. The non-breaking
+space comes from typesetting: PDF layout engines and HTML (`&nbsp;`) use
+it to keep words on one line, and the clipboard preserves it faithfully.
+Zero-width spaces are inserted by some content-management systems and
+word processors as line-break hints. The byte order mark arrives at the
+front of files saved as “UTF-8 with BOM” by some Windows editors, where
+it fuses with the first field name or the first key of a CSV. All of
+these survive visual inspection, and all of them disappear under
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)’s
+invisible-character pass. Stripping them right after
+[`read.csv()`](https://rdrr.io/r/utils/read.table.html) keeps them out
+of every downstream join at once.
+
 ## Scenario 4: The Slowly Growing Mismatch
 
 An e-commerce pipeline joins transaction records to a product catalogue.
@@ -250,8 +674,8 @@ The code had not changed. A new data entry clerk had joined the
 warehouse team in December. The canonical product code format was
 `"WDG-100"` – uppercase prefix, dash, three-digit suffix. The new clerk
 sometimes omitted the dash, sometimes typed lowercase. The warehouse
-system did fuzzy matching internally, so it accepted the codes. The ETL
-join did not.
+system did fuzzy matching internally, so it accepted codes that the ETL
+join’s exact comparison rejected.
 
 ``` r
 
@@ -281,7 +705,40 @@ spot than complete ones.
 ``` r
 
 report <- join_spy(transactions, catalogue, by = "product_code")
+report
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: product_code
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 8 Unique keys: 7 Duplicate keys: 1 NA keys: 0
+#> Right table: Rows: 6 Unique keys: 6 Duplicate keys: 0 NA keys: 0
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 3
+#> Keys only in left: 4
+#> Keys only in right: 3
+#> Match rate (left): "42.9%"
+#> 
+#> ── Issues Detected ──
+#> 
+#> ! Left table has 1 duplicate key(s) affecting 2 rows - may cause row multiplication
+#> ! 1 key(s) would match if case-insensitive (e.g., 'wdg-103' vs 'WDG-103')
+#> ℹ 10 near-match(es) found (e.g., 'WDG102' ~ 'WDG-102', 'WDG103' ~ 'WDG-103', 'WDG102' ~ 'WDG-100') - possible typos?
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 4
+#> left_join: 8
+#> right_join: 7
+#> full_join: 11
 ```
+
+The report stacks several findings: the case check catches `"wdg-103"`,
+and the near-match check lines the dashless codes up against catalogue
+entries one or two edits away.
 
 Here is where this scenario differs from the previous ones.
 [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
@@ -342,6 +799,23 @@ stripping invisible characters). Inserting a dash into `"WDG102"`
 requires knowing the canonical format – that fix has to come from
 someone who understands the data.
 
+The upstream story here is the most general of the five: two systems
+with different matching strictness, connected by people. The warehouse
+software tolerated sloppy codes because its internal lookup was fuzzy;
+the ETL join was exact; the clerk had no way to see the difference. Keys
+typed by humans drift like this wherever entry goes unvalidated. A rule
+rejecting anything that fails `^[A-Z]{3}-\d{3}$` at the warehouse
+boundary would have caught every malformed code in December. The drift
+is also visible from the R side: a match rate sliding from 99% to 94%
+over three months is a measurable signal, and logging a report per
+pipeline run
+([`vignette("production")`](https://gillescolling.com/joinspy/articles/production.md)
+covers
+[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
+and
+[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md))
+turns that slide into an alert long before finance notices the margins.
+
 ## Scenario 5: Compound Keys
 
 Two government datasets need to be linked: regional economic indicators
@@ -388,7 +862,46 @@ pinpoints which column in the compound key has the problem:
 ``` r
 
 report <- join_spy(economics, population, by = c("region", "year"))
+report
+#> 
+#> ── Join Diagnostic Report ──────────────────────────────────────────────────────
+#> Join columns: region, year
+#> 
+#> ── Table Summary ──
+#> 
+#> Left table: Rows: 6 Unique keys: 6 Duplicate keys: 0 NA keys: 0
+#> Right table: Rows: 6 Unique keys: 6 Duplicate keys: 0 NA keys: 0
+#> 
+#> ── Match Analysis ──
+#> 
+#> Keys in both: 4
+#> Keys only in left: 2
+#> Keys only in right: 2
+#> Match rate (left): "66.7%"
+#> 
+#> ── Issues Detected ──
+#> 
+#> ! Left column 'region' has 1 value(s) with leading/trailing whitespace
+#> ℹ 1 near-match(es) found (e.g., 'Asia Pacific ' ~ 'Asia Pacific') - possible typos?
+#> 
+#> ── Per-Column Breakdown ──
+#> 
+#> region: "66.7%" match rate (2/3)
+#> year: "100%" match rate (2/2)
+#> ℹ Lowest match rate: region
+#> 
+#> ── Expected Row Counts ──
+#> 
+#> inner_join: 4
+#> left_join: 6
+#> right_join: 6
+#> full_join: 8
 ```
+
+The per-column breakdown shows the year column matching fully while
+region falls short, and names region as the column with the lowest match
+rate. From there the whitespace warning above it identifies the exact
+values at fault.
 
 ``` r
 
@@ -402,6 +915,15 @@ nrow(result)
 Six rows. With compound keys, a string issue in any single column is
 enough to break the match. The more columns in the key, the more places
 a byte-level discrepancy can occur.
+
+Compound keys generalize everything in this vignette: each column added
+to `by` is one more surface where any of these defects can land.
+Region-by-year panels, site-by-date field records, patient-by-visit
+tables: wherever observations are keyed by a combination of identifiers,
+the component columns tend to come from different upstream systems with
+different hygiene. An aggregate match rate cannot say which component is
+at fault. The per-column breakdown can, and checking it first rules out
+most candidate explanations before any bytes get inspected.
 
 ## The Pattern
 
@@ -418,3 +940,51 @@ invisible Unicode are all one-line operations.
 surfaces the cause directly, which is especially useful with data from
 external sources, manual entry, PDF extraction, or cross-system
 integrations.
+
+Worked the other way around, the shared structure becomes a checklist.
+Each question in a join post-mortem maps to one call:
+
+- Is this join safe to run? `join_spy(x, y, by)` gives the full report:
+  key summaries, match rates, detected issues, and expected row counts
+  for all four join types.
+- I want a yes/no gate in a script. `key_check(x, y, by)` prints a short
+  status and invisibly returns a logical; `warn = FALSE` makes it
+  silent.
+- Which rows share a key? `key_duplicates(data, by)` returns the
+  duplicated rows with a `.n_duplicates` count column.
+- What would a cleanup change?
+  [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+  with `dry_run = TRUE` previews the repairs without touching the data.
+- Fix the mechanical problems.
+  [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+  trims whitespace, standardizes case, strips the invisible characters,
+  and optionally converts empty strings to NA.
+- Show me the fix as code. `suggest_repairs(report)` prints
+  copy-pasteable snippets matched to the issues a report found.
+- The join already ran and the row count is wrong.
+  `join_explain(result, x, y, by)` reconstructs where the rows went.
+- Two versions of a table differ and the change is unclear.
+  `join_diff(before, after, by)` compares dimensions, columns, and key
+  statistics.
+- This must never happen silently again.
+  [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
+  performs the join and errors when an expectation like `expect = "1:1"`
+  is violated.
+
+The split between diagnosis and repair is deliberate.
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+never modifies data, and
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+only applies transformations that are correct regardless of what the
+keys mean: trimming, casing, stripping invisible characters. Anything
+that requires knowing the data, like the missing dashes of Scenario 4,
+stays a human decision, with the diagnostics pointing at it.
+
+For the wider catalogue of join failures beyond strings (duplicate keys
+multiplying rows, NA keys, accidental cartesian products), see
+[`vignette("common-issues")`](https://gillescolling.com/joinspy/articles/common-issues.md).
+For a tour of the full API on one worked example, see
+[`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md).
+The string-level defects collected here are the ones that resist
+inspection longest; one diagnostic call before joining data you did not
+generate yourself covers every one of them.

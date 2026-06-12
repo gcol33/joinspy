@@ -24,7 +24,10 @@ that look identical on screen compare as different during a join.
 
 This vignette covers the issues joinspy detects, ordered roughly by frequency.
 String-level issues come first, then structural ones (duplicates, NAs, type
-mismatches, Cartesian explosions).
+mismatches, Cartesian explosions). Each section follows the same arc: the
+symptom, a small dataset that reproduces it, the diagnosis with joinspy, and
+the fix. The closing section collects the individual tools into a numbered
+workflow we can follow when a join goes wrong and the cause is unknown.
 
 ## Trailing and leading whitespace
 
@@ -56,7 +59,19 @@ sales_clean <- join_repair(sales, by = "product")
 key_check(sales_clean, inventory, by = "product")
 ```
 
-Passing `dry_run = TRUE` previews the repair without applying it.
+When we want to see what a repair would do before committing to it,
+`dry_run = TRUE` prints the planned changes and leaves the data untouched:
+
+```{r}
+join_repair(sales, by = "product", dry_run = TRUE)
+```
+
+Whitespace usually enters at the import boundary. Base `read.csv()` keeps it
+unless we set `strip.white = TRUE`, while `readr::read_csv()` trims by
+default (`trim_ws = TRUE`). Fixed-width exports and hand-typed spreadsheet
+cells are the other common sources; a stray space typed after a product name
+survives every visual inspection. Trimming key columns right after import,
+before any join, keeps the problem from spreading into derived tables.
 
 The problem compounds with composite keys -- whitespace in *any* column is
 enough to break the match:
@@ -80,13 +95,18 @@ join_spy(shipments, stock, by = c("warehouse", "product"))
 ```
 
 Both `warehouse` and `product` carry trailing spaces in `shipments`, so all
-three rows fail to match. A single `join_repair()` call cleans every key
-column at once:
+three rows fail to match. The per-column breakdown in the report shows which
+component of the composite key drags the match rate down. A single
+`join_repair()` call cleans every key column at once:
 
 ```{r}
 shipments_clean <- join_repair(shipments, by = c("warehouse", "product"))
 key_check(shipments_clean, stock, by = c("warehouse", "product"))
 ```
+
+Composite keys deserve this check even when each column was cleaned at some
+point, because new joins often combine columns that were never used as keys
+before.
 
 ## Case mismatches
 
@@ -120,10 +140,20 @@ repaired <- join_repair(sensors, metadata, by = "station", standardize_case = "l
 key_check(repaired$x, repaired$y, by = "station")
 ```
 
-`"lower"`, `"upper"`, and `"title"` all work. One thing to watch for: if the
-key column is a `factor`, case standardization changes the level labels but not
-the underlying integer codes. Converting to character first avoids silently
-merging distinct factor levels.
+`standardize_case` accepts `"lower"` or `"upper"`. One thing to watch for:
+`join_repair()` only modifies character columns. A factor key passes through
+untouched, with no message, so we convert factors with `as.character()`
+before repairing; the factor section below shows this in detail. A second
+caution applies when case carries meaning. If sample codes `a1` and `A1` are
+genuinely different things, folding the case merges them, so we run
+`key_duplicates()` on the folded column before trusting the repair.
+
+Case drift between tables usually means they came from systems with
+different conventions. Many SQL collations compare case-insensitively, so
+`AWS-01` and `aws-01` are the same row there and different rows in R. Mixed
+case inside a single column, as in `sensors` above, more often points to
+hand entry. Standardizing to one case at import, and writing that convention
+down, prevents the next data pull from reintroducing the mismatch.
 
 ## Encoding and invisible characters
 
@@ -157,14 +187,22 @@ left_fixed <- join_repair(left, by = "city")
 key_check(left_fixed, right, by = "city")
 ```
 
+When the repair needs to live in a script that does not load joinspy,
+`suggest_repairs()` turns the report into plain base R that we can paste
+anywhere:
+
+```{r}
+report <- join_spy(left, right, by = "city")
+suggest_repairs(report)
+```
+
 Common sources include PDF extraction, web scraping, and cross-platform file
 transfers. `join_repair()` handles the most common offenders: non-breaking
 spaces, zero-width joiners, BOM markers, and soft hyphens. It does not attempt
 full Unicode normalization (NFC vs. NFD); for that we would reach for
-`stringi::stri_trans_nfc()`.
-
-If `join_spy()` still flags encoding issues after repair, `suggest_repairs()`
-on a report will print the exact R code needed.
+`stringi::stri_trans_nfc()`. When the same feed delivers non-breaking spaces
+every week, we move the `gsub()` line above into the import script and raise
+the issue with whoever owns the producing system.
 
 ## Empty strings masquerading as data
 
@@ -188,6 +226,9 @@ visits <- data.frame(
 join_spy(patients, visits, by = "mrn")
 ```
 
+`join_spy()` lists empty strings as an informational issue: two empty keys
+do match each other, so whether that counts as a bug depends on what the
+rows mean. Here it would attach an anonymous visit to an anonymous patient.
 Converting empties to `NA` before joining fixes this, since NAs never match
 in R:
 
@@ -196,15 +237,108 @@ patients_fixed <- join_repair(patients, by = "mrn", empty_to_na = TRUE)
 patients_fixed$mrn
 ```
 
+Passing `y` repairs both tables in one call; the return value is then a list
+with elements `x` and `y`:
+
+```{r}
+both <- join_repair(patients, visits, by = "mrn", empty_to_na = TRUE)
+both$y$mrn
+```
+
+Empty strings are what base `read.csv()` produces for blank cells in
+character columns; only the literal string `"NA"` becomes missing by
+default. Passing `na.strings = c("NA", "")` at import keeps blanks out of
+the key column entirely, which is cheaper than repairing after the fact.
 Note that `data.table` treats `""` and `NA_character_` as distinct in keyed
 joins, so when using a data.table backend we need to convert empty strings to
 `NA` on both sides.
 
+## Factor keys
+
+Legacy code written under `stringsAsFactors = TRUE`, modeling pipelines, and
+some file readers hand us keys stored as factors. A factor key holding the
+same labels as a character key joins fine, since R coerces during the merge,
+and `join_spy()` notes the type difference:
+
+```{r}
+surveys <- data.frame(
+  site = factor(c("North", "South", "East")),
+  count = c(12, 7, 30)
+)
+
+habitats <- data.frame(
+  site = c("North", "South", "East"),
+  habitat = c("bog", "meadow", "forest"),
+  stringsAsFactors = FALSE
+)
+
+join_spy(surveys, habitats, by = "site")
+```
+
+All 3 keys match, and the report carries an informational note that the
+factor will be coerced. The trap is what factors hide. The string checks in
+`join_spy()` run on character columns only, so whitespace buried inside
+factor labels goes unreported:
+
+```{r}
+plots <- data.frame(site = factor(c("North ", "South")), richness = c(14, 9))
+join_spy(plots, habitats, by = "site")
+```
+
+The match analysis still does its job (1 of 2 keys matches), but nothing
+in the issue list says why. Converting to character first surfaces the
+cause:
+
+```{r}
+plots$site <- as.character(plots$site)
+join_spy(plots, habitats, by = "site")
+```
+
+Now the whitespace warning appears, along with a near-match pairing
+`'North '` with `'North'`. `join_repair()` follows the same character-only
+rule: called on the factor version it returns the data unchanged, with no
+message. After the conversion it repairs the key as usual:
+
+```{r}
+plots_clean <- join_repair(plots, by = "site")
+key_check(plots_clean, habitats, by = "site")
+```
+
+When both keys are factors, `join_spy()` also compares their level sets.
+Levels that exist on only one side are reported even when no data row uses
+them, which catches lookup tables built against a stale set of categories:
+
+```{r}
+surveys_f <- data.frame(
+  site = factor(c("North", "South"), levels = c("North", "South", "West"))
+)
+habitats_f <- data.frame(site = factor(c("North", "South", "East")))
+
+join_spy(surveys_f, habitats_f, by = "site")
+```
+
+Here `"West"` is declared on the left and never observed, while `"East"`
+exists on the right, so the report counts 1 level unique to each side. The
+case section mentioned the level-versus-label trap; here it is concretely.
+`as.numeric()` on a factor returns the internal level codes:
+
+```{r}
+plot_ids <- factor(c("10", "20", "30"))
+as.numeric(plot_ids)
+as.numeric(as.character(plot_ids))
+```
+
+The direct conversion returns the codes 1, 2, 3, while the route
+through `as.character()` recovers the labels 10, 20, 30. A key column converted the
+first way joins against the wrong rows with no warning, since the codes are
+perfectly valid numbers. Any time a numeric-looking key passes through a
+factor, the double conversion is the safe route.
+
 ## Near-matches and typos
 
-Sometimes keys are close but not identical. These are not whitespace or case
-problems -- they are genuine mismatches that `join_spy()` flags when it finds
-keys in one table with no counterpart in the other.
+Sometimes keys are close but not identical. These are genuine mismatches,
+untouched by whitespace and case repairs, that `join_spy()` flags when it
+finds keys in one table with no counterpart in the other.
 
 ```{r}
 orders <- data.frame(
@@ -224,7 +358,8 @@ report <- join_spy(orders, catalog, by = "sku")
 
 Internally, `join_spy()` computes Levenshtein distances between unmatched keys.
 When two keys differ by only one or two characters, the report flags them as
-near-matches. Here is a clearer example with multiple near-matches:
+near-matches; `GZM-300` and `GZM-301` sit at edit distance 1. Here is a
+clearer example with multiple near-matches:
 
 ```{r}
 employees <- data.frame(
@@ -244,9 +379,20 @@ report <- join_spy(employees, payroll, by = "name")
 
 `"Johnson"` vs. `"Jonhson"` (transposition), `"Smithe"` vs. `"Smith"` (extra
 character), and `"O'Brian"` vs. `"O'Brien"` (vowel swap) are all within edit
-distance 2. `"Williams"` matches exactly. There is no automated fix here since
-joinspy cannot know which side is correct, but the near-match list gives a
-concrete starting point for building a lookup table.
+distance 2. `"Williams"` matches exactly. The search has deliberate limits:
+it considers pairs within edit distance 2, skips keys shorter than 3
+characters, and scans at most the first 50 unmatched keys against 100
+candidates. On large tables the near-match list is therefore a sample of the
+problem, a prompt to look further along the same lines.
+
+There is no automated fix here since joinspy cannot know which side is
+correct, but the near-match list gives a concrete starting point for
+building a lookup table. Once we have decided which side is authoritative,
+the corrections belong in a small recode table stored with the pipeline, so
+the same typo never needs re-diagnosing. Typos like these usually trace back
+to hand-entered data; where the key is supposed to be machine-generated, a
+near-match is worth treating as a symptom of two systems generating IDs
+independently.
 
 ## Duplicate keys
 
@@ -274,9 +420,23 @@ join_spy(orders, addresses, by = "customer_id")
 key_duplicates(addresses, by = "customer_id")
 ```
 
+Every offending row comes back with a `.n_duplicates` count attached.
+`keep = "first"` or `keep = "last"` reduce the output to one row per key,
+which doubles as a quick deduplication candidate:
+
+```{r}
+key_duplicates(addresses, by = "customer_id", keep = "first")
+```
+
 If each customer should have one address, we deduplicate first. If we
 genuinely need all combinations, the multiplication is correct -- we just
-need to know it will happen.
+need to know it will happen. Duplicates often mean the right table is a
+different entity than assumed: an address *history* where we expected a
+current-address table. The fix is then a data-model decision, picking the
+latest row, aggregating, or accepting the multiplication deliberately.
+Whichever we choose, encoding it as a `join_strict()` expectation (shown
+below) catches the silent regression when next month's extract grows a
+second row per customer.
 
 When *both* sides have duplicates, each key group produces a Cartesian
 product:
@@ -302,6 +462,9 @@ expansion before we run the join:
 ```{r}
 check_cartesian(orders_dup, prices_dup, by = "product")
 ```
+
+By default it raises the alarm when the result would exceed 10 times the
+larger input; the `threshold` argument adjusts that cut-off.
 
 ## NA keys
 
@@ -332,6 +495,38 @@ orders_clean <- orders[!is.na(orders$customer_id), ]
 key_check(orders_clean, customers, by = "customer_id")
 ```
 
+Removal is right when missing IDs are noise. When they carry meaning, say
+unattributed orders that should collect under a single placeholder customer,
+the sentinel route makes them joinable. We replace the NA with an impossible
+ID on both sides:
+
+```{r}
+orders_s <- orders
+customers_s <- customers
+orders_s$customer_id[is.na(orders_s$customer_id)] <- -1
+customers_s$customer_id[is.na(customers_s$customer_id)] <- -1
+
+join_spy(orders_s, customers_s, by = "customer_id")
+```
+
+The NA warnings are gone and the match rate is 100%. The report now warns
+about something new: the sentinel appears twice on the left, so it is a
+duplicate key, and both formerly missing orders will attach to the same
+`"Unknown"` row:
+
+```{r}
+merge(orders_s, customers_s, by = "customer_id", all.x = TRUE)
+```
+
+A sentinel makes missing keys equal to each other, which is the behavior we
+asked for, so the duplication here is expected. The value must be impossible
+as a real ID: `-1` works for positive integer keys, something like
+`"__missing__"` for character keys. Both sides need the replacement, since a
+sentinel on one side and an NA on the other still never match. NA keys
+usually arrive from earlier outer joins or from incomplete entry, and
+`join_explain()` lists them as one of its standard explanations, so a
+post-join row-count surprise often traces back to this section.
+
 ## Type mismatches
 
 One table stores IDs as integers, the other as character strings.
@@ -361,6 +556,66 @@ where the join either fails or coerces through numeric intermediaries.
 invoices$product_id <- as.character(invoices$product_id)
 key_check(invoices, products, by = "product_id")
 ```
+
+The repair direction matters: converting the numeric side to character, as
+above, is lossless. Going the other way destroys any key with leading
+zeros:
+
+```{r}
+ids <- c("007", "042")
+as.character(as.numeric(ids))
+```
+
+`"007"` comes back as `"7"`, a different key, and any non-numeric ID in the
+column becomes NA outright. Type drift between extracts is common with
+type-sniffing readers: a column of all-digit IDs imports as numeric until
+the first alphanumeric ID appears, at which point the same column imports as
+character. Pinning the type at import (`colClasses` in base R, `col_types`
+in readr) removes the drift at its source.
+
+## Numeric keys with floating-point noise
+
+Numeric keys produced by arithmetic carry floating-point noise. Three depths
+built by accumulating 0.1 look identical to hand-typed values when printed,
+and the third one is different:
+
+```{r}
+readings <- data.frame(depth = cumsum(rep(0.1, 3)), oxygen = c(8.1, 7.4, 6.9))
+layers <- data.frame(
+  depth = c(0.1, 0.2, 0.3),
+  layer = c("surface", "mid", "bottom")
+)
+
+print(readings$depth, digits = 17)
+readings$depth == layers$depth
+```
+
+The accumulated third value is 0.30000000000000004, so the comparison with
+0.3 fails. `join_spy()` warns about the key type and the match analysis
+shows the damage:
+
+```{r}
+join_spy(readings, layers, by = "depth")
+```
+
+The match analysis reports 2 keys in both tables, with one orphan on each
+side: the two versions of 0.3 that refuse to be equal. The floating-point
+warning fires whenever a key column holds non-integer doubles, on both
+tables here, because any such key can fail this way. Pinpointing which
+values differ by an epsilon is outside joinspy's string checks; that part is
+on us, and the standard fix is to remove the noise before joining:
+
+```{r}
+readings$depth <- round(readings$depth, 6)
+all(readings$depth %in% layers$depth)
+```
+
+Rounding to a precision coarser than the noise and finer than the data
+restores exact equality. A sturdier design avoids fractional keys entirely.
+Store depth in centimeters as an integer, or format it to a fixed-width
+string, and this failure mode does not come back. Fractional keys usually
+appear when a measured quantity gets promoted into an identifier; an
+explicit ID column upstream removes the temptation.
 
 ## Many-to-many explosions
 
@@ -397,6 +652,18 @@ before the explosion happens:
 join_strict(items, payments, by = "order_id", type = "left", expect = "1:n")
 ```
 
+The error arrives before any rows are produced, which matters when the
+explosion would have been the million-row kind. Many-to-many joins that are
+intentional, such as enumerating all item-payment pairs for reconciliation,
+are better written with the expectation stated: `expect = "n:m"` passes
+every cardinality and documents that the expansion is deliberate. The
+`*_join_spy()` wrappers report the predicted row count for the same reason,
+so a join expected to preserve row counts announces itself when it triples
+them instead. Explosions almost always enter a pipeline through a table
+that quietly gained a second granularity, an `order_id` table that became
+an `order_id` x `payment_attempt` table, and the cardinality check is the
+cheapest way to notice.
+
 ## No matches at all
 
 An inner join returns zero rows, and downstream code may not check for an
@@ -427,60 +694,197 @@ system_a$user_num <- gsub("^USR-0*", "", system_a$user_id)
 key_check(system_a, system_b, by = c("user_num" = "user_id"))
 ```
 
+Format mismatches like this are structural: the two systems never shared an
+ID scheme, so joinspy can report the zero overlap and the absence of string
+issues, and that combination is itself the diagnosis. The `gsub()`
+extraction works when one format embeds the other. Failing that, somebody
+owns a mapping table, and the join goes through it. The named `by` in the
+final `key_check()` call joins our derived `user_num` column against system
+B's `user_id` without renaming anything; the next section covers that
+syntax.
+
+## Differently named key columns
+
+Tables rarely agree on what the key column is called: `patient_id` in the
+admissions extract is `mrn` in the registry. A named `by` vector maps left
+names to right names, and every joinspy function accepts it:
+
+```{r}
+admissions <- data.frame(
+  patient_id = c("P-01 ", "P-02", "P-03"),
+  ward = c("A", "B", "B"),
+  stringsAsFactors = FALSE
+)
+
+registry <- data.frame(
+  mrn = c("P-01", "P-02", "P-04"),
+  dob = c("1980-03-02", "1975-11-19", "1990-07-30"),
+  stringsAsFactors = FALSE
+)
+
+join_spy(admissions, registry, by = c("patient_id" = "mrn"))
+```
+
+The header line shows the mapping (`patient_id = mrn`), and the diagnostics
+run as usual: the whitespace warning points at `patient_id`, and the
+near-match list pairs `'P-01 '` with `'P-01'`. Repairs and joins take the
+same vector, with `join_repair()` fixing `patient_id` on the left and `mrn`
+on the right:
+
+```{r}
+fixed <- join_repair(admissions, registry, by = c("patient_id" = "mrn"))
+left_join_spy(fixed$x, fixed$y, by = c("patient_id" = "mrn"), verbose = FALSE)
+```
+
+The result keeps the left table's column name, `patient_id`, and the
+unmatched `P-03` carries an NA date of birth. Renaming columns before a join
+is the common workaround, and it tends to decay as scripts grow, with the
+rename and the join drifting apart until one of them changes alone. Passing
+the mapping straight to `by` keeps the two halves of the decision in one
+place.
+
 ## Troubleshooting workflow
 
-When a join goes wrong, we typically start with `join_spy()`. It checks
-string quality, key overlap, cardinality, and predicted row counts in one
-call:
+The sections above each handle one failure in isolation. On a real join we
+usually do not know which failure we have, so this is the order we check in,
+walked through on a pair of tables that carries several problems at once:
 
-```{r eval = FALSE}
-report <- join_spy(x, y, by = "key_col")
+```{r}
+shipments <- data.frame(
+  order_ref = c("ORD-1 ", "ORD-2", "ORD-2", "ORD-3", NA),
+  qty = c(10, 25, 5, 12, 7),
+  stringsAsFactors = FALSE
+)
+
+invoices <- data.frame(
+  order_ref = c("ORD-1", "ORD-2", "ORD-4"),
+  total = c(99, 250, 80),
+  stringsAsFactors = FALSE
+)
 ```
 
-For large datasets, passing `sample = 1000` runs the check on a random subset
-first.
+**Step 1: run `join_spy()` and read it top to bottom.** The match rate and
+the issue list classify the problem before we attempt any fix. For large
+tables, `sample = 1000` runs the same diagnostics on a random subset first.
 
-If the report flags whitespace, case, encoding, or empty strings,
-`join_repair()` handles them:
-
-```{r eval = FALSE}
-x_clean <- join_repair(x, by = "key_col")
-# or both sides:
-repaired <- join_repair(x, y, by = "key_col", standardize_case = "lower")
+```{r}
+report <- join_spy(shipments, invoices, by = "order_ref")
+report
 ```
 
-If the predicted row count is higher than expected, we inspect duplicates and
-decide whether to aggregate or deduplicate:
+One report, four findings: a duplicate key, an NA key, a whitespace
+problem, and a clutch of near-matches. Each outcome routes to a step below:
 
-```{r eval = FALSE}
-key_duplicates(y, by = "key_col")
+1. Whitespace, case, encoding, or empty-string issues: repair the strings
+   (step 2).
+2. Duplicate keys, or expected row counts above the left table's row count:
+   inspect the duplicates (step 3).
+3. NA keys: decide what missing means (step 4).
+
+4. A type mismatch: align the types (step 5).
+
+5. Near-matches on otherwise clean keys: build a recode table (the
+   near-match section above).
+6. A 0% match rate with no string issues: a format mismatch; extract a
+   common key or find the mapping table (the no-matches section above).
+
+**Step 2: repair the strings.** `join_repair()` covers whitespace, case,
+invisible characters, and empty strings in one call; `suggest_repairs(report)`
+prints the equivalent base R when the fix has to live elsewhere.
+
+```{r}
+shipments_repaired <- join_repair(shipments, by = "order_ref")
 ```
 
-Once keys are clean, `join_strict()` enforces the cardinality we expect:
+**Step 3: inspect the duplicates.** `key_duplicates()` shows the rows,
+`detect_cardinality()` names the relationship, and `check_cartesian()`
+bounds the blow-up for the worst keys.
 
-```{r eval = FALSE}
-result <- join_strict(x_clean, y_clean, by = "key_col",
-                      type = "left", expect = "1:1")
+```{r}
+key_duplicates(shipments_repaired, by = "order_ref")
+detect_cardinality(shipments_repaired, invoices, by = "order_ref")
 ```
 
-If the joined output still looks wrong, `join_explain()` gives a breakdown of
-what happened:
+`ORD-2` appears twice on the left, so the relationship is `n:1`. If two
+shipments per order is the real shape of the data, we keep it and state the
+expectation in step 6. If it is an accident, we deduplicate or aggregate
+here.
 
-```{r eval = FALSE}
-result <- left_join_spy(x_clean, y_clean, by = "key_col")
-join_explain(result, x_clean, y_clean, by = "key_col")
+**Step 4: decide what NA keys mean.** Dropping loses the 7-unit shipment
+with no reference; the sentinel route from the NA section keeps it under a
+placeholder. Here we drop:
+
+```{r}
+shipments_repaired <- shipments_repaired[!is.na(shipments_repaired$order_ref), ]
 ```
 
-In production pipelines, `set_log_file()` routes all subsequent reports to a
-log file, which is useful for debugging issues after the fact:
+**Step 5: align types.** Nothing to fix in this example; when the report
+shows a numeric column joining a character column, we convert toward
+character (the lossless direction) or pin the types at import.
 
-```{r eval = FALSE}
-set_log_file("logs/join_diagnostics.log")
-# All join_spy() / join_explain() calls now append to this file
+**Step 6: join with the expectation enforced.** `join_strict()` performs
+the join only if the cardinality matches what we declared, so the data
+model decision from step 3 becomes executable:
+
+```{r}
+result <- join_strict(shipments_repaired, invoices, by = "order_ref",
+                      type = "left", expect = "n:1")
+result
 ```
 
-For pipelines with multiple joins, `analyze_join_chain()` diagnoses an entire
-sequence at once, reporting where the first problem enters the chain.
+**Step 7: audit the result.** `join_explain()` accounts for the difference
+between input and output row counts after the fact:
+
+```{r}
+join_explain(result, shipments_repaired, invoices,
+             by = "order_ref", type = "left")
+```
+
+The row count is unchanged at 4, and the explanation still lists the two
+forces that could have moved it: the duplicate `ORD-2` and the unmatched
+`ORD-3`. On a larger join those same lines say where unexpected rows came
+from. `join_diff()` offers the same comparison oriented around column
+changes.
+
+**Step 8: leave a trail.** In production pipelines, `set_log_file()` routes
+every subsequent `*_join_spy()` report to a file, which is how we debug a
+join that went wrong last Tuesday:
+
+```{r}
+log_file <- tempfile(fileext = ".log")
+set_log_file(log_file)
+audited <- left_join_spy(shipments_repaired, invoices,
+                         by = "order_ref", .quiet = TRUE)
+set_log_file(NULL)
+readLines(log_file)[2:8]
+```
+
+With `.quiet = TRUE` the join runs silently and the report still lands in
+the log; `last_report()` retrieves it in-session. For one-off snapshots,
+`log_report()` writes a single report, and a `.json` or `.rds` extension
+switches the format for machine consumption.
+
+**Step 9: for multi-join pipelines, check the whole chain.**
+`analyze_join_chain()` runs the step 1 diagnostic at every link and reports
+where the first problem enters:
+
+```{r}
+orders <- data.frame(order_id = 1:3, customer_id = c(1, 2, 2))
+customers <- data.frame(customer_id = 1:3, region_id = c(1, 1, 2))
+regions <- data.frame(region_id = 1:2, name = c("North", "South"))
+
+analyze_join_chain(
+  tables = list(orders = orders, customers = customers, regions = regions),
+  joins = list(
+    list(left = "orders", right = "customers", by = "customer_id"),
+    list(left = "result", right = "regions", by = "region_id")
+  )
+)
+```
+
+Each step gets its own match rate and issue count, with `"result"` referring
+to the output of the previous join, so the first bad link in a five-table
+pipeline is visible without bisecting by hand.
 
 ## See Also
 
@@ -488,4 +892,4 @@ sequence at once, reporting where the first problem enters the chain.
 
 - `?join_spy`, `?join_repair`, `?key_check`, `?join_strict`
 
-- `?check_cartesian`, `?detect_cardinality`, `?join_explain`
+- `?check_cartesian`, `?detect_cardinality`, `?join_explain`, `?suggest_repairs`

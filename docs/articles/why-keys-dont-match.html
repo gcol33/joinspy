@@ -7,8 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Why Your Keys Don't Match • joinspy</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Why Your Keys Don't Match">
@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">joinspy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,8 +49,7 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/quickstart.html">Quick Start</a></li>
-    <li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
+<li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="../articles/common-issues.html">Common Join Problems</a></li>
     <li><a class="dropdown-item" href="../articles/production.html">Joins in Production</a></li>
     <li><a class="dropdown-item" href="../articles/backends.html">Working with Backends</a></li>
@@ -88,7 +87,7 @@
                         <h4 data-toc-skip class="author">Gilles
 Colling</h4>
             
-            <h4 data-toc-skip class="date">2026-03-31</h4>
+            <h4 data-toc-skip class="date">2026-06-13</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/joinspy/blob/HEAD/vignettes/why-keys-dont-match.Rmd" class="external-link"><code>vignettes/why-keys-dont-match.Rmd</code></a></small>
       <div class="d-none name"><code>why-keys-dont-match.Rmd</code></div>
@@ -105,7 +104,258 @@ different at the byte level: a trailing space, a case mismatch, or a
 zero-width Unicode character that occupies no screen width.</p>
 <p>This vignette walks through five scenarios where joins fail for
 string-level reasons that resist casual inspection. The data is
-synthetic; the patterns come from real pipelines.</p>
+synthetic; the patterns come from real pipelines. The first two sections
+cover the mechanics: what R compares when it joins two key columns, and
+which checks <code><a href="../reference/join_spy.html">join_spy()</a></code> runs against them. The scenarios
+then put both to work.</p>
+<div class="section level2">
+<h2 id="what-a-join-actually-compares">What a Join Actually Compares<a class="anchor" aria-label="anchor" href="#what-a-join-actually-compares"></a>
+</h2>
+<p>Every join reduces to the same primitive: for each key in one table,
+find the positions of equal keys in the other. <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>
+builds on <code><a href="https://rdrr.io/r/base/match.html" class="external-link">match()</a></code>; dplyr and data.table run their own join
+engines and apply the same standard of equality. Two character keys are
+equal when their byte sequences are equal, after R translates any
+declared encodings to a common representation. There is no trimming, no
+case folding, no Unicode normalization along the way. A single byte of
+difference makes two keys strangers.</p>
+<p><code><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical()</a></code> applies the same standard, which makes it a
+convenient way to test what a join will see:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="st">"CUST-1002"</span></span>
+<span><span class="va">b</span> <span class="op">&lt;-</span> <span class="st">"CUST-1002 "</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="va">a</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  9 10</span></span></code></pre></div>
+<p>The strings differ by one character, and <code><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw()</a></code>
+shows which byte is responsible:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="va">b</span><span class="op">)</span></span>
+<span><span class="co">#&gt;  [1] 43 55 53 54 2d 31 30 30 32 20</span></span></code></pre></div>
+<p>The final <code>20</code> is an ordinary space. This one happens to
+be easy to spot once printed as bytes. The characters behind longer
+debugging sessions render as nothing at all, or as something
+indistinguishable from a space. The non-breaking space is the classic
+example:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">space</span> <span class="op">&lt;-</span> <span class="st">"\u0020"</span></span>
+<span><span class="va">nbsp</span> <span class="op">&lt;-</span> <span class="st">"\u00A0"</span></span>
+<span><span class="va">space</span> <span class="op">==</span> <span class="va">nbsp</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/utf8Conversion.html" class="external-link">utf8ToInt</a></span><span class="op">(</span><span class="va">space</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/utf8Conversion.html" class="external-link">utf8ToInt</a></span><span class="op">(</span><span class="va">nbsp</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  32 160</span></span></code></pre></div>
+<p><code><a href="https://rdrr.io/r/base/utf8Conversion.html" class="external-link">utf8ToInt()</a></code> returns the Unicode code point of each
+character, which makes it the most direct inspection tool for a
+suspicious key: 32 is the space on your keyboard, 160 is the
+non-breaking space from a web page or a PDF. Both render as a gap of the
+same width.</p>
+<p>Two strings can also be visually identical with no invisible
+characters anywhere in them. Unicode allows an accented letter to be
+written two ways: as one precomposed code point, or as a base letter
+followed by a combining accent.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">e_one</span> <span class="op">&lt;-</span> <span class="st">"\u00E9"</span></span>
+<span><span class="va">e_two</span> <span class="op">&lt;-</span> <span class="st">"e\u0301"</span></span>
+<span><span class="va">e_one</span></span>
+<span><span class="co">#&gt; [1] "é"</span></span>
+<span><span class="va">e_two</span></span>
+<span><span class="co">#&gt; [1] "é"</span></span>
+<span><span class="va">e_one</span> <span class="op">==</span> <span class="va">e_two</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span></code></pre></div>
+<p>Both print as the same accented e. The first is a single code point,
+the second is two, and R compares the sequences without normalizing
+them:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="va">e_one</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/nchar.html" class="external-link">nchar</a></span><span class="op">(</span><span class="va">e_two</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1 2</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/utf8Conversion.html" class="external-link">utf8ToInt</a></span><span class="op">(</span><span class="va">e_one</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 233</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/utf8Conversion.html" class="external-link">utf8ToInt</a></span><span class="op">(</span><span class="va">e_two</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 101 769</span></span></code></pre></div>
+<p>A reference table typed by hand usually carries the precomposed form.
+Data that passed through certain text processors or through macOS file
+paths can arrive decomposed, and a column of city or person names will
+then fail to match a column that looks identical character for
+character.</p>
+<p>Encoding adds one more layer. The same character can be stored as
+different bytes depending on the encoding. The umlauted u is one byte in
+latin1 and two bytes in UTF-8:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">city_utf8</span> <span class="op">&lt;-</span> <span class="st">"Z\u00FCrich"</span></span>
+<span><span class="va">city_latin1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/iconv.html" class="external-link">iconv</a></span><span class="op">(</span><span class="va">city_utf8</span>, from <span class="op">=</span> <span class="st">"UTF-8"</span>, to <span class="op">=</span> <span class="st">"latin1"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Encoding.html" class="external-link">Encoding</a></span><span class="op">(</span><span class="va">city_utf8</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/Encoding.html" class="external-link">Encoding</a></span><span class="op">(</span><span class="va">city_latin1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "UTF-8"  "latin1"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="va">city_utf8</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 5a c3 bc 72 69 63 68</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="va">city_latin1</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 5a fc 72 69 63 68</span></span></code></pre></div>
+<p>Different bytes, same declared meaning. As long as the declaration is
+correct, R translates before comparing and the keys still match:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">city_utf8</span> <span class="op">==</span> <span class="va">city_latin1</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>Trouble starts when bytes and declaration disagree. A latin1 file
+read as if it were UTF-8, or read with no declaration on a system that
+assumes one, produces strings whose bytes no longer mean what R thinks
+they mean. Accented keys then differ from their clean counterparts, and
+nothing in the comparison machinery reconciles them.
+<code><a href="../reference/join_spy.html">join_spy()</a></code> flags key columns that mix declared encodings,
+since mixed declarations within a single column usually mean some values
+entered the session by a different route than the rest.</p>
+<p>None of the failures above produce a warning, because none of them
+are errors from R’s point of view. String equality is exact and well
+defined. A join that matches three keys out of six did what it was told,
+and a zero-row inner join is a legitimate result (an anti-join hopes for
+exactly that). <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> has no way to know that six matches
+were expected. The evidence that something went wrong lives in the
+difference between the rows you expected and the rows you got, which is
+why diagnosing it takes a separate step.</p>
+</div>
+<div class="section level2">
+<h2 id="what-join_spy-scans-for">What join_spy() Scans For<a class="anchor" aria-label="anchor" href="#what-join_spy-scans-for"></a>
+</h2>
+<p>Every scenario below ends with a <code><a href="../reference/join_spy.html">join_spy()</a></code> call, so it
+is worth laying out what that call checks. Everything happens inside the
+one function and comes back in the printed <code>JoinReport</code>. The
+chunks in this section reproduce individual checks with base R so the
+mechanics are visible; none of them are needed in normal use.</p>
+<div class="section level3">
+<h3 id="whitespace">Whitespace<a class="anchor" aria-label="anchor" href="#whitespace"></a>
+</h3>
+<p>Leading and trailing whitespace is detected with anchored regular
+expressions over each character key column:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CUST-1001"</span>, <span class="st">"CUST-1002 "</span>, <span class="st">" CUST-1004"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"^\\s+"</span>, <span class="va">ids</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] FALSE FALSE  TRUE</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="st">"\\s+$"</span>, <span class="va">ids</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] FALSE  TRUE FALSE</span></span></code></pre></div>
+<p>Values failing either test are collected and reported with their
+column and table. Interior whitespace is left alone:
+<code>"New York"</code> and <code>"New  York"</code> differ by an
+interior space and fall to the near-match check further down.</p>
+</div>
+<div class="section level3">
+<h3 id="case">Case<a class="anchor" aria-label="anchor" href="#case"></a>
+</h3>
+<p>A case mismatch is defined relationally. A key counts only when it
+has no exact match in the other table and would gain one if both sides
+were lowercased:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">crm</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ALICE@ACME.COM"</span>, <span class="st">"EVE@ACME.COM"</span><span class="op">)</span></span>
+<span><span class="va">clicks</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"alice@acme.com"</span>, <span class="st">"frank@acme.com"</span><span class="op">)</span></span>
+<span><span class="va">crm</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="va">crm</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/chartr.html" class="external-link">tolower</a></span><span class="op">(</span><span class="va">clicks</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt; [1] "ALICE@ACME.COM"</span></span></code></pre></div>
+<p>Eve appears in neither form on the right, so she is a genuinely
+unmatched key; Alice is a case mismatch. The report keeps example pairs,
+which is how the output in Scenario 2 can name the specific addresses
+involved.</p>
+</div>
+<div class="section level3">
+<h3 id="invisible-characters-and-encodings">Invisible characters and encodings<a class="anchor" aria-label="anchor" href="#invisible-characters-and-encodings"></a>
+</h3>
+<p>The encoding check looks for two conditions: mixed declared encodings
+within one column, read off <code><a href="https://rdrr.io/r/base/Encoding.html" class="external-link">Encoding()</a></code>, and the presence of
+any of five code points that render as nothing or as an ordinary-looking
+space:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">hidden</span> <span class="op">&lt;-</span> <span class="st">"[\u200B\u200C\u200D\uFEFF\u00A0]"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grepl</a></span><span class="op">(</span><span class="va">hidden</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"India\u200B"</span>, <span class="st">"India"</span><span class="op">)</span>, perl <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  TRUE FALSE</span></span></code></pre></div>
+<p>The watch list is U+200B (zero-width space), U+200C (zero-width
+non-joiner), U+200D (zero-width joiner), U+FEFF (byte order mark), and
+U+00A0 (non-breaking space). U+00A0 earns its place on the list because
+regex whitespace classes and <code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code> treat it
+inconsistently across engines and locales, so a whitespace scan alone
+cannot be trusted to catch it.</p>
+</div>
+<div class="section level3">
+<h3 id="empty-strings">Empty strings<a class="anchor" aria-label="anchor" href="#empty-strings"></a>
+</h3>
+<p>Empty strings sit in a blind spot: they read as missing data to a
+human and as a valid key to a join.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">""</span> <span class="op">==</span> <span class="st">""</span>, <span class="st">""</span> <span class="op">==</span> <span class="cn">NA</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE   NA</span></span></code></pre></div>
+<p>An empty string equals another empty string, so two tables that both
+use <code>""</code> as a placeholder will match those rows to each
+other. The report flags empty keys as informational, and
+<code>join_repair(empty_to_na = TRUE)</code> converts them when that
+match behavior is unwanted.</p>
+</div>
+<div class="section level3">
+<h3 id="types-factors-and-numeric-keys">Types, factors, and numeric keys<a class="anchor" aria-label="anchor" href="#types-factors-and-numeric-keys"></a>
+</h3>
+<p>Key columns can also be factors, integers, or doubles, and the type
+checks cover the seams between column types. Character against factor is
+reported as informational, since the join will coerce. Character against
+numeric is reported as a warning, because that coercion is a recurring
+source of surprises. When both sides are factors, their level sets are
+compared and any levels unique to one side are listed. Numeric keys get
+two checks of their own: keys with decimal parts, and keys large enough
+to exhaust double precision.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fl">0.1</span> <span class="op">+</span> <span class="fl">0.2</span> <span class="op">==</span> <span class="fl">0.3</span></span>
+<span><span class="co">#&gt; [1] FALSE</span></span>
+<span><span class="fl">2</span><span class="op">^</span><span class="fl">53</span> <span class="op">==</span> <span class="fl">2</span><span class="op">^</span><span class="fl">53</span> <span class="op">+</span> <span class="fl">1</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>Both lines are standard floating-point behavior, and both translate
+directly into joins that quietly drop or merge rows: a key computed as
+<code>0.1 + 0.2</code> will never find a key stored as <code>0.3</code>,
+and above <code>2^53</code> distinct integer IDs stop being
+distinguishable as doubles.</p>
+</div>
+<div class="section level3">
+<h3 id="duplicates-nas-and-predicted-row-counts">Duplicates, NAs, and predicted row counts<a class="anchor" aria-label="anchor" href="#duplicates-nas-and-predicted-row-counts"></a>
+</h3>
+<p>Separately from string quality, <code><a href="../reference/join_spy.html">join_spy()</a></code> summarizes
+each table’s keys: rows, unique keys, duplicated keys, NA keys.
+Duplicates matter because each match against a duplicated key multiplies
+rows; NA keys matter because they will not match. From the per-key
+counts the report predicts the result size of all four join types. The
+inner-join figure is the sum, over matched keys, of the product of each
+side’s counts, which is exactly the arithmetic that turns a
+harmless-looking duplicate into a memory problem. The report object also
+carries a heuristic memory estimate per join type for the same
+reason.</p>
+</div>
+<div class="section level3">
+<h3 id="near-matches">Near matches<a class="anchor" aria-label="anchor" href="#near-matches"></a>
+</h3>
+<p>Whatever remains unmatched after the exact analysis goes through a
+typo hunt. Unmatched left keys are compared against right keys by
+Levenshtein edit distance, the minimum number of single-character
+insertions, deletions, and substitutions needed to turn one string into
+the other, computed with <code><a href="https://rdrr.io/r/utils/adist.html" class="external-link">utils::adist()</a></code>:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/adist.html" class="external-link">adist</a></span><span class="op">(</span><span class="st">"WDG102"</span>, <span class="st">"WDG-102"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      [,1]</span></span>
+<span><span class="co">#&gt; [1,]    1</span></span>
+<span><span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/adist.html" class="external-link">adist</a></span><span class="op">(</span><span class="st">"Asia Pacific "</span>, <span class="st">"Asia Pacific"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;      [,1]</span></span>
+<span><span class="co">#&gt; [1,]    1</span></span></code></pre></div>
+<p>A pair is reported as a near match when its distance is 1 or 2. Keys
+shorter than three characters are skipped, since nearly everything sits
+within two edits of a string like <code>"A7"</code>. A length pre-check
+discards pairs whose lengths already differ by more than two, and to
+keep the scan cheap the comparison covers at most 50 unmatched left keys
+against 100 right keys, reporting the 10 closest pairs. Near matches
+stay informational: <code>"WDG102"</code> sitting one edit from
+<code>"WDG-102"</code> is strong evidence of a typo, and the report
+points it out without changing anything.</p>
+</div>
+<div class="section level3">
+<h3 id="compound-keys">Compound keys<a class="anchor" aria-label="anchor" href="#compound-keys"></a>
+</h3>
+<p>For multi-column keys, an extra pass analyzes each key column on its
+own: unique values per side, matches between them, and a per-column
+match rate. The column with the lowest match rate is called out as the
+likely problem column. Scenario 5 shows what this buys: an overall match
+rate says something is wrong, and the per-column breakdown says
+where.</p>
+</div>
+</div>
 <div class="section level2">
 <h2 id="scenario-1-the-excel-export">Scenario 1: The Excel Export<a class="anchor" aria-label="anchor" href="#scenario-1-the-excel-export"></a>
 </h2>
@@ -116,7 +366,7 @@ quarters, everything works. Then one month, 30% of the sales records
 stop matching. Nobody changed the code or the customer database. The
 partner’s IDs are all present in the internal system – or so it
 appears.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">partner_sales</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"CUST-1001"</span>, <span class="st">"CUST-1002 "</span>, <span class="st">"CUST-1003"</span>,</span>
 <span>                  <span class="st">" CUST-1004"</span>, <span class="st">"CUST-1005 "</span>, <span class="st">"CUST-1006"</span><span class="op">)</span>,</span>
@@ -133,23 +383,51 @@ appears.</p>
 <p>Nothing in <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> or <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> reveals the
 issue – trailing spaces are invisible in console output.
 <code><a href="../reference/join_spy.html">join_spy()</a></code> catches it:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">partner_sales</span>, <span class="va">internal_db</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">partner_sales</span>, <span class="va">internal_db</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
+<span><span class="va">report</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; Join columns: <span style="color: #00BB00;">customer_id</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Table Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: <span style="color: #0000BB;">6</span> Unique keys: <span style="color: #0000BB;">6</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Right table: Rows: <span style="color: #0000BB;">7</span> Unique keys: <span style="color: #0000BB;">7</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Match Analysis</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Keys only in left: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Keys only in right: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; Match rate (left): <span style="color: #0000BB;">"50%"</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Issues Detected</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Left column 'customer_id' has 3 value(s) with leading/trailing whitespace</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 10 near-match(es) found (e.g., 'CUST-1002 ' ~ 'CUST-1002', ' CUST-1004' ~ 'CUST-1004', 'CUST-1002 ' ~ 'CUST-1001') - possible typos?</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Expected Row Counts</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; inner_join: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; left_join: <span style="color: #0000BB;">6</span></span></span>
+<span><span class="co">#&gt; right_join: <span style="color: #0000BB;">7</span></span></span>
+<span><span class="co">#&gt; full_join: <span style="color: #0000BB;">10</span></span></span></code></pre></div>
 <p>Three of the six partner IDs carry whitespace.
 <code>"CUST-1002 "</code> is a different string from
 <code>"CUST-1002"</code> as far as R is concerned.
 <code><a href="../reference/join_repair.html">join_repair()</a></code> trims both tables at once:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">partner_sales</span>, <span class="va">internal_db</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">3</span> value(s)</span></span>
 <span><span class="va">partner_fixed</span> <span class="op">&lt;-</span> <span class="va">repaired</span><span class="op">$</span><span class="va">x</span></span>
 <span><span class="va">internal_fixed</span> <span class="op">&lt;-</span> <span class="va">repaired</span><span class="op">$</span><span class="va">y</span></span></code></pre></div>
 <p>We can verify the repair worked:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">partner_fixed</span>, <span class="va">internal_fixed</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Key check passed: no issues detected</span></span></code></pre></div>
 <p>And now the join gives us what we expected:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">partner_fixed</span>, <span class="va">internal_fixed</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 6</span></span></code></pre></div>
@@ -158,6 +436,16 @@ preserved trailing spaces from a variable-width source column. Excel
 renders <code>"CUST-1002"</code> and <code>"CUST-1002 "</code>
 identically, so nobody noticed. Trailing whitespace is the single most
 common join failure we see in practice.</p>
+<p>Excel is one of several routes for this defect. SQL
+<code>CHAR(n)</code> columns pad values with spaces to a fixed width,
+and some database drivers deliver the padding to R intact. Fixed-width
+flat files do it by construction. Manual entry adds a trailing space
+whenever someone types one before tabbing out of a cell. Every route
+passes through an ingestion point, so the cheapest prevention is to trim
+key columns once, where external data enters the pipeline, and to put a
+<code><a href="../reference/key_check.html">key_check()</a></code> call at that boundary. It would have turned
+this quarter’s silent 30% match drop into a loud failure on the first
+run.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-2-two-databases-two-conventions">Scenario 2: Two Databases, Two Conventions<a class="anchor" aria-label="anchor" href="#scenario-2-two-databases-two-conventions"></a>
@@ -166,7 +454,7 @@ common join failure we see in practice.</p>
 churn analysis. The CRM stores email addresses in uppercase (a database
 migration decision from the late 1990s). The web app stores them in
 lowercase. Both systems are internally consistent.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crm_profiles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  email <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ALICE@ACME.COM"</span>, <span class="st">"BOB@ACME.COM"</span>, <span class="st">"CAROL@ACME.COM"</span>,</span>
 <span>            <span class="st">"DAVE@ACME.COM"</span>, <span class="st">"EVE@ACME.COM"</span><span class="op">)</span>,</span>
@@ -183,19 +471,46 @@ lowercase. Both systems are internally consistent.</p>
 <p>An inner join returns zero rows. R’s string comparison is
 case-sensitive, so every key pair fails. <code><a href="../reference/join_spy.html">join_spy()</a></code> flags
 the situation before the join:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">crm_profiles</span>, <span class="va">click_events</span>, by <span class="op">=</span> <span class="st">"email"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">crm_profiles</span>, <span class="va">click_events</span>, by <span class="op">=</span> <span class="st">"email"</span><span class="op">)</span></span>
+<span><span class="va">report</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; Join columns: <span style="color: #00BB00;">email</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Table Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: <span style="color: #0000BB;">5</span> Unique keys: <span style="color: #0000BB;">5</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Right table: Rows: <span style="color: #0000BB;">5</span> Unique keys: <span style="color: #0000BB;">5</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Match Analysis</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Keys only in left: <span style="color: #0000BB;">5</span></span></span>
+<span><span class="co">#&gt; Keys only in right: <span style="color: #0000BB;">5</span></span></span>
+<span><span class="co">#&gt; Match rate (left): <span style="color: #0000BB;">"0%"</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Issues Detected</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 4 key(s) would match if case-insensitive (e.g., 'ALICE@ACME.COM' vs 'alice@acme.com')</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Expected Row Counts</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; inner_join: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; left_join: <span style="color: #0000BB;">5</span></span></span>
+<span><span class="co">#&gt; right_join: <span style="color: #0000BB;">5</span></span></span>
+<span><span class="co">#&gt; full_join: <span style="color: #0000BB;">10</span></span></span></code></pre></div>
 <p><code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> generates the fix:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Suggested Repairs</span> <span style="color: #00BBBB;">───────────────────────────────────────────────────────────</span></span></span>
 <span><span class="co">#&gt; <span style="color: #8787AF;"># Standardize case:</span></span></span>
-<span><span class="co">#&gt; x<span style="color: #D7AF00;">$</span>email <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>x<span style="color: #D7AF00;">$</span>email<span style="color: #D7AF00;">)</span></span></span>
-<span><span class="co">#&gt; y<span style="color: #D7AF00;">$</span>email <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>y<span style="color: #D7AF00;">$</span>email<span style="color: #D7AF00;">)</span></span></span></code></pre></div>
+<span><span class="co">#&gt; x<span style="color: #D7AF00;">[[</span><span style="color: #00AFAF;">"email"</span><span style="color: #D7AF00;">]]</span> <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>x<span style="color: #BBBB00;">[[</span><span style="color: #00AFAF;">"email"</span><span style="color: #BBBB00;">]]</span><span style="color: #D7AF00;">)</span></span></span>
+<span><span class="co">#&gt; y<span style="color: #D7AF00;">[[</span><span style="color: #00AFAF;">"email"</span><span style="color: #D7AF00;">]]</span> <span style="color: #D7AF00;">&lt;-</span> <span style="font-weight: bold;">tolower</span><span style="color: #D7AF00;">(</span>y<span style="color: #BBBB00;">[[</span><span style="color: #00AFAF;">"email"</span><span style="color: #BBBB00;">]]</span><span style="color: #D7AF00;">)</span></span></span></code></pre></div>
 <p>Or we can use <code><a href="../reference/join_repair.html">join_repair()</a></code> directly, specifying case
 standardization:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span></span>
 <span>  <span class="va">crm_profiles</span>, <span class="va">click_events</span>,</span>
 <span>  by <span class="op">=</span> <span class="st">"email"</span>,</span>
@@ -205,7 +520,7 @@ standardization:</p>
 <p>After lowercasing both sides, the inner join returns four matched
 rows (everyone except Eve, who has no click data, and Frank, who is not
 in the CRM):</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"email"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 4</span></span>
@@ -219,6 +534,16 @@ in the CRM):</p>
 the right normalization here. For other identifier types (product codes,
 country abbreviations), <code>"upper"</code> may be more
 appropriate.</p>
+<p>Conventions like these are system-wide and invisible from inside the
+system that holds them. Many database collations compare strings
+case-insensitively, so the CRM’s uppercase migration never broke an
+internal query; the web stack lowercased on write and was just as
+self-consistent. The mismatch exists only at the seam where the two
+systems meet, which is where an R join usually sits. The first join
+between two new sources is the right moment to run
+<code><a href="../reference/join_spy.html">join_spy()</a></code> and settle the convention question, and spelling
+the choice out through <code>standardize_case</code> documents it in
+code for the next person who touches the pipeline.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-3-the-pdf-copy-paste">Scenario 3: The PDF Copy-Paste<a class="anchor" aria-label="anchor" href="#scenario-3-the-pdf-copy-paste"></a>
@@ -229,7 +554,7 @@ PDF, so she copies the table from the PDF viewer, pastes into a
 spreadsheet, cleans up the columns, and reads the CSV into R. The data
 looks perfect – every country name is spelled correctly. But half the
 countries fail to match a reference population table.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Simulating PDF copy-paste artifacts:</span></span>
 <span><span class="co"># \u00A0 is non-breaking space, \u200B is zero-width space</span></span>
 <span><span class="va">pdf_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -246,21 +571,52 @@ countries fail to match a reference population table.</p>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Printing the PDF data shows nothing wrong:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pdf_data</span><span class="op">$</span><span class="va">country</span></span>
 <span><span class="co">#&gt; [1] "Brazil"  "India​"   "Germany" "Japan "  "Canada"  "France​"</span></span></code></pre></div>
 <p>The zero-width space after “India” and “France” occupies zero pixels.
 The non-breaking space after “Japan” renders like a regular space but is
 U+00A0, not U+0020 – <code><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws()</a></code> will not always remove it.
 The merge reflects this:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 3</span></span></code></pre></div>
 <p>Three of six countries match. <code><a href="../reference/join_spy.html">join_spy()</a></code> detects the
 invisible characters:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span>
+<span><span class="va">report</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; Join columns: <span style="color: #00BB00;">country</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Table Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: <span style="color: #0000BB;">6</span> Unique keys: <span style="color: #0000BB;">6</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Right table: Rows: <span style="color: #0000BB;">7</span> Unique keys: <span style="color: #0000BB;">7</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Match Analysis</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Keys only in left: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Keys only in right: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; Match rate (left): <span style="color: #0000BB;">"50%"</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Issues Detected</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Left column 'country' has encoding issues (invisible chars or mixed encoding)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 3 near-match(es) found (e.g., 'India​' ~ 'India', 'Japan ' ~ 'Japan', 'France​' ~ 'France') - possible typos?</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Expected Row Counts</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; inner_join: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; left_join: <span style="color: #0000BB;">6</span></span></span>
+<span><span class="co">#&gt; right_join: <span style="color: #0000BB;">7</span></span></span>
+<span><span class="co">#&gt; full_join: <span style="color: #0000BB;">10</span></span></span></code></pre></div>
+<p>Alongside the encoding warning, the near-match check reaches the same
+conclusion from a different direction: each contaminated name sits one
+edit away from its clean counterpart in the reference table.</p>
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">pdf_data</span>, <span class="va">reference</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">3</span> value(s)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"country"</span><span class="op">)</span><span class="op">)</span></span>
@@ -270,6 +626,18 @@ artifacts, but web scraping, OCR output, and legacy mainframe exports
 can produce them too. One useful debugging trick outside of joinspy:
 <code>nchar("India\u200B")</code> returns 6, not 5. But that requires
 already suspecting the problem.</p>
+<p>Each watched code point has a typical entry route. The non-breaking
+space comes from typesetting: PDF layout engines and HTML
+(<code>&amp;nbsp;</code>) use it to keep words on one line, and the
+clipboard preserves it faithfully. Zero-width spaces are inserted by
+some content-management systems and word processors as line-break hints.
+The byte order mark arrives at the front of files saved as “UTF-8 with
+BOM” by some Windows editors, where it fuses with the first field name
+or the first key of a CSV. All of these survive visual inspection, and
+all of them disappear under <code><a href="../reference/join_repair.html">join_repair()</a></code>’s
+invisible-character pass. Stripping them right after
+<code><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv()</a></code> keeps them out of every downstream join at
+once.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-4-the-slowly-growing-mismatch">Scenario 4: The Slowly Growing Mismatch<a class="anchor" aria-label="anchor" href="#scenario-4-the-slowly-growing-mismatch"></a>
@@ -282,9 +650,9 @@ until finance flagged a margin discrepancy in April.</p>
 warehouse team in December. The canonical product code format was
 <code>"WDG-100"</code> – uppercase prefix, dash, three-digit suffix. The
 new clerk sometimes omitted the dash, sometimes typed lowercase. The
-warehouse system did fuzzy matching internally, so it accepted the
-codes. The ETL join did not.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+warehouse system did fuzzy matching internally, so it accepted codes
+that the ETL join’s exact comparison rejected.</p>
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Product catalogue (canonical format)</span></span>
 <span><span class="va">catalogue</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product_code <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"WDG-100"</span>, <span class="st">"WDG-101"</span>, <span class="st">"WDG-102"</span>,</span>
@@ -305,15 +673,47 @@ codes. The ETL join did not.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Some codes match and some do not, which makes partial failures harder
 to spot than complete ones.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">transactions</span>, <span class="va">catalogue</span>, by <span class="op">=</span> <span class="st">"product_code"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">transactions</span>, <span class="va">catalogue</span>, by <span class="op">=</span> <span class="st">"product_code"</span><span class="op">)</span></span>
+<span><span class="va">report</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; Join columns: <span style="color: #00BB00;">product_code</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Table Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: <span style="color: #0000BB;">8</span> Unique keys: <span style="color: #0000BB;">7</span> Duplicate keys: <span style="color: #0000BB;">1</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Right table: Rows: <span style="color: #0000BB;">6</span> Unique keys: <span style="color: #0000BB;">6</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Match Analysis</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Keys only in left: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; Keys only in right: <span style="color: #0000BB;">3</span></span></span>
+<span><span class="co">#&gt; Match rate (left): <span style="color: #0000BB;">"42.9%"</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Issues Detected</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Left table has 1 duplicate key(s) affecting 2 rows - may cause row multiplication</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 key(s) would match if case-insensitive (e.g., 'wdg-103' vs 'WDG-103')</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 10 near-match(es) found (e.g., 'WDG102' ~ 'WDG-102', 'WDG103' ~ 'WDG-103', 'WDG102' ~ 'WDG-100') - possible typos?</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Expected Row Counts</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; inner_join: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; left_join: <span style="color: #0000BB;">8</span></span></span>
+<span><span class="co">#&gt; right_join: <span style="color: #0000BB;">7</span></span></span>
+<span><span class="co">#&gt; full_join: <span style="color: #0000BB;">11</span></span></span></code></pre></div>
+<p>The report stacks several findings: the case check catches
+<code>"wdg-103"</code>, and the near-match check lines the dashless
+codes up against catalogue entries one or two edits away.</p>
 <p>Here is where this scenario differs from the previous ones.
 <code><a href="../reference/join_repair.html">join_repair()</a></code> can fix the case issue, but it cannot insert
 the missing dashes – that requires domain knowledge about the code
 format.</p>
 <p>We can do a dry run to see what <code><a href="../reference/join_repair.html">join_repair()</a></code> would
 fix:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">transactions</span>, <span class="va">catalogue</span>,</span>
 <span>            by <span class="op">=</span> <span class="st">"product_code"</span>,</span>
 <span>            standardize_case <span class="op">=</span> <span class="st">"upper"</span>,</span>
@@ -325,20 +725,20 @@ fix:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">product_code</span>: upper case (2)</span></span></code></pre></div>
 <p>After applying the mechanical fixes:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">transactions</span>, <span class="va">catalogue</span>,</span>
 <span>                        by <span class="op">=</span> <span class="st">"product_code"</span>,</span>
 <span>                        standardize_case <span class="op">=</span> <span class="st">"upper"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span></code></pre></div>
 <p>The case issues are resolved, but the missing dashes remain. A manual
 transformation handles those:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Manual fix: insert dash if missing in product codes matching the pattern</span></span>
 <span><span class="va">fix_codes</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">codes</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"^([A-Z]{3})(\\d)"</span>, <span class="st">"\\1-\\2"</span>, <span class="va">codes</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span><span class="op">$</span><span class="va">product_code</span> <span class="op">&lt;-</span> <span class="fu">fix_codes</span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span><span class="op">$</span><span class="va">product_code</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"product_code"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 8</span></span></code></pre></div>
@@ -347,6 +747,18 @@ context-free transformations (trimming, case normalization, stripping
 invisible characters). Inserting a dash into <code>"WDG102"</code>
 requires knowing the canonical format – that fix has to come from
 someone who understands the data.</p>
+<p>The upstream story here is the most general of the five: two systems
+with different matching strictness, connected by people. The warehouse
+software tolerated sloppy codes because its internal lookup was fuzzy;
+the ETL join was exact; the clerk had no way to see the difference. Keys
+typed by humans drift like this wherever entry goes unvalidated. A rule
+rejecting anything that fails <code>^[A-Z]{3}-\d{3}$</code> at the
+warehouse boundary would have caught every malformed code in December.
+The drift is also visible from the R side: a match rate sliding from 99%
+to 94% over three months is a measurable signal, and logging a report
+per pipeline run (<code><a href="../articles/production.html">vignette("production")</a></code> covers
+<code><a href="../reference/log_report.html">log_report()</a></code> and <code><a href="../reference/set_log_file.html">set_log_file()</a></code>) turns that
+slide into an alert long before finance notices the margins.</p>
 </div>
 <div class="section level2">
 <h2 id="scenario-5-compound-keys">Scenario 5: Compound Keys<a class="anchor" aria-label="anchor" href="#scenario-5-compound-keys"></a>
@@ -355,7 +767,7 @@ someone who understands the data.</p>
 indicators and regional population estimates, keyed on region and year.
 The year column is numeric and matches without trouble. The region
 column has a whitespace problem that affects only some records.</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">economics</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  region <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North America"</span>, <span class="st">"Europe"</span>, <span class="st">"Asia Pacific "</span>,</span>
 <span>             <span class="st">"North America"</span>, <span class="st">"Europe"</span>, <span class="st">"Asia Pacific "</span><span class="op">)</span>,</span>
@@ -374,7 +786,7 @@ column has a whitespace problem that affects only some records.</p>
 <p>In a compound key join, both columns must match. The year column is
 fine everywhere, but <code>"Asia Pacific "</code> with a trailing space
 will not match <code>"Asia Pacific"</code>.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">merged</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
@@ -382,9 +794,47 @@ will not match <code>"Asia Pacific"</code>.</p>
 Pacific does not, because of the trailing space.</p>
 <p><code><a href="../reference/join_spy.html">join_spy()</a></code> pinpoints which column in the compound key
 has the problem:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">report</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; Join columns: <span style="color: #00BB00;">region, year</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Table Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: <span style="color: #0000BB;">6</span> Unique keys: <span style="color: #0000BB;">6</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; Right table: Rows: <span style="color: #0000BB;">6</span> Unique keys: <span style="color: #0000BB;">6</span> Duplicate keys: <span style="color: #0000BB;">0</span> NA keys: <span style="color: #0000BB;">0</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Match Analysis</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; Keys only in left: <span style="color: #0000BB;">2</span></span></span>
+<span><span class="co">#&gt; Keys only in right: <span style="color: #0000BB;">2</span></span></span>
+<span><span class="co">#&gt; Match rate (left): <span style="color: #0000BB;">"66.7%"</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Issues Detected</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Left column 'region' has 1 value(s) with leading/trailing whitespace</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> 1 near-match(es) found (e.g., 'Asia Pacific ' ~ 'Asia Pacific') - possible typos?</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Per-Column Breakdown</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">region</span>: <span style="color: #0000BB;">"66.7%"</span> match rate (<span style="color: #0000BB;">2</span>/<span style="color: #0000BB;">3</span>)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">year</span>: <span style="color: #0000BB;">"100%"</span> match rate (<span style="color: #0000BB;">2</span>/<span style="color: #0000BB;">2</span>)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Lowest match rate: <span style="color: #00BB00;">region</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Expected Row Counts</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; inner_join: <span style="color: #0000BB;">4</span></span></span>
+<span><span class="co">#&gt; left_join: <span style="color: #0000BB;">6</span></span></span>
+<span><span class="co">#&gt; right_join: <span style="color: #0000BB;">6</span></span></span>
+<span><span class="co">#&gt; full_join: <span style="color: #0000BB;">8</span></span></span></code></pre></div>
+<p>The per-column breakdown shows the year column matching fully while
+region falls short, and names region as the column with the lowest match
+rate. From there the whitespace warning above it identifies the exact
+values at fault.</p>
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">economics</span>, <span class="va">population</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"region"</span>, <span class="st">"year"</span><span class="op">)</span><span class="op">)</span></span>
@@ -393,6 +843,15 @@ has the problem:</p>
 <p>Six rows. With compound keys, a string issue in any single column is
 enough to break the match. The more columns in the key, the more places
 a byte-level discrepancy can occur.</p>
+<p>Compound keys generalize everything in this vignette: each column
+added to <code>by</code> is one more surface where any of these defects
+can land. Region-by-year panels, site-by-date field records,
+patient-by-visit tables: wherever observations are keyed by a
+combination of identifiers, the component columns tend to come from
+different upstream systems with different hygiene. An aggregate match
+rate cannot say which component is at fault. The per-column breakdown
+can, and checking it first rules out most candidate explanations before
+any bytes get inspected.</p>
 </div>
 <div class="section level2">
 <h2 id="the-pattern">The Pattern<a class="anchor" aria-label="anchor" href="#the-pattern"></a>
@@ -407,6 +866,50 @@ invisible Unicode are all one-line operations.</p>
 <p><code><a href="../reference/join_spy.html">join_spy()</a></code> surfaces the cause directly, which is
 especially useful with data from external sources, manual entry, PDF
 extraction, or cross-system integrations.</p>
+<p>Worked the other way around, the shared structure becomes a
+checklist. Each question in a join post-mortem maps to one call:</p>
+<ul>
+<li>Is this join safe to run? <code>join_spy(x, y, by)</code> gives the
+full report: key summaries, match rates, detected issues, and expected
+row counts for all four join types.</li>
+<li>I want a yes/no gate in a script. <code>key_check(x, y, by)</code>
+prints a short status and invisibly returns a logical;
+<code>warn = FALSE</code> makes it silent.</li>
+<li>Which rows share a key? <code>key_duplicates(data, by)</code>
+returns the duplicated rows with a <code>.n_duplicates</code> count
+column.</li>
+<li>What would a cleanup change? <code><a href="../reference/join_repair.html">join_repair()</a></code> with
+<code>dry_run = TRUE</code> previews the repairs without touching the
+data.</li>
+<li>Fix the mechanical problems. <code><a href="../reference/join_repair.html">join_repair()</a></code> trims
+whitespace, standardizes case, strips the invisible characters, and
+optionally converts empty strings to NA.</li>
+<li>Show me the fix as code. <code>suggest_repairs(report)</code> prints
+copy-pasteable snippets matched to the issues a report found.</li>
+<li>The join already ran and the row count is wrong.
+<code>join_explain(result, x, y, by)</code> reconstructs where the rows
+went.</li>
+<li>Two versions of a table differ and the change is unclear.
+<code>join_diff(before, after, by)</code> compares dimensions, columns,
+and key statistics.</li>
+<li>This must never happen silently again. <code><a href="../reference/join_strict.html">join_strict()</a></code>
+performs the join and errors when an expectation like
+<code>expect = "1:1"</code> is violated.</li>
+</ul>
+<p>The split between diagnosis and repair is deliberate.
+<code><a href="../reference/join_spy.html">join_spy()</a></code> never modifies data, and
+<code><a href="../reference/join_repair.html">join_repair()</a></code> only applies transformations that are correct
+regardless of what the keys mean: trimming, casing, stripping invisible
+characters. Anything that requires knowing the data, like the missing
+dashes of Scenario 4, stays a human decision, with the diagnostics
+pointing at it.</p>
+<p>For the wider catalogue of join failures beyond strings (duplicate
+keys multiplying rows, NA keys, accidental cartesian products), see
+<code><a href="../articles/common-issues.html">vignette("common-issues")</a></code>. For a tour of the full API on
+one worked example, see <code><a href="../articles/quickstart.html">vignette("quickstart")</a></code>. The
+string-level defects collected here are the ones that resist inspection
+longest; one diagnostic call before joining data you did not generate
+yourself covers every one of them.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

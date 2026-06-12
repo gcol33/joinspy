@@ -7,8 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Joins in Production • joinspy</title>
 <script src="../lightswitch.js"></script><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
-<script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
+<link href="../deps/bootstrap-5.3.8/bootstrap.min.css" rel="stylesheet">
+<script src="../deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Joins in Production">
@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">joinspy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,8 +49,7 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/quickstart.html">Quick Start</a></li>
-    <li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
+<li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="../articles/common-issues.html">Common Join Problems</a></li>
     <li><a class="dropdown-item" href="../articles/production.html">Joins in Production</a></li>
     <li><a class="dropdown-item" href="../articles/backends.html">Working with Backends</a></li>
@@ -88,7 +87,7 @@
                         <h4 data-toc-skip class="author">Gilles
 Colling</h4>
             
-            <h4 data-toc-skip class="date">2026-03-31</h4>
+            <h4 data-toc-skip class="date">2026-06-13</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/joinspy/blob/HEAD/vignettes/production.Rmd" class="external-link"><code>vignettes/production.Rmd</code></a></small>
       <div class="d-none name"><code>production.Rmd</code></div>
@@ -102,11 +101,28 @@ at the output. This vignette wires joinspy into automated pipelines so
 that join problems surface as errors or log entries. Every example uses
 synthetic data and <code><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile()</a></code> paths, so the whole thing
 runs end to end.</p>
+<p>Production here means any context where nobody watches the console:
+cron jobs, CI runs, scheduled reports, Shiny back ends,
+<code>targets</code> pipelines. The failure mode is depressingly
+uniform. An upstream table gains a duplicate key or a whitespace-padded
+ID, the join silently multiplies or drops rows, and the numbers in the
+final report drift. Weeks can pass before anyone traces the drift back
+to the join, and by then the bad rows have propagated into every table
+built on top of it. The tools below convert that slow, silent failure
+into a loud, immediate one: a non-zero exit status the scheduler flags,
+a log entry a monitoring script picks up, or a failed unit test in
+CI.</p>
+<p>We work through the pieces in increasing order of machinery – hard
+assertions, silent instrumented joins, programmatic report inspection,
+cardinality guards, unit tests for join contracts, logging, multi-join
+chain analysis, and finally what all of this costs at runtime.</p>
 <div class="section level2">
 <h2 id="assertions-with-key_check">Assertions with key_check()<a class="anchor" aria-label="anchor" href="#assertions-with-key_check"></a>
 </h2>
 <p><code><a href="../reference/key_check.html">key_check()</a></code> returns a single logical – <code>TRUE</code>
-if no issues were detected, <code>FALSE</code> otherwise. The simplest
+if no issues were detected, <code>FALSE</code> otherwise. Behind that
+logical sit four scans: duplicate keys, NA keys, leading or trailing
+whitespace, and case mismatches between the two tables. The simplest
 assertion wraps it in <code><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot()</a></code>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -123,6 +139,13 @@ assertion wraps it in <code><a href="https://rdrr.io/r/base/stopifnot.html" clas
 <span></span>
 <span><span class="co"># This passes -- keys are clean</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>An assertion this cheap can run on every execution. When it passes,
+it adds nothing to the log; when it fails, <code><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot()</a></code>
+raises an error, the script exits with a non-zero status, and the
+scheduler marks the run as failed. That exit status is what makes the
+pattern work: cron, GitHub Actions, and Airflow all key their alerting
+off it, so a failed key check becomes a notification without any extra
+plumbing.</p>
 <p>When the keys have problems, the script halts:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders_dirty</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -134,10 +157,16 @@ assertion wraps it in <code><a href="https://rdrr.io/r/base/stopifnot.html" clas
 <span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders_dirty</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> key_check(orders_dirty, customers, by = "customer_id", warn = FALSE) is not TRUE</span></span></code></pre></div>
+<p>The two padded IDs (<code>"C02 "</code> and <code>"C03 "</code>)
+would silently fail to match in a left join – the rows survive, the
+customer columns come back <code>NA</code>, and downstream aggregation
+quietly treats them as customerless orders. Halting at the check, before
+the join runs, keeps the bad rows out of everything built
+afterwards.</p>
 <p>With <code>warn = FALSE</code>, the printed diagnostics are
-suppressed – in a cron job or CI pipeline, we want the script to fail
-hard rather than print warnings. An explicit
-<code>if</code>/<code>stop</code> gives us a custom error message:</p>
+suppressed; in a cron job or CI pipeline, the hard failure is the
+message. An explicit <code>if</code>/<code>stop</code> gives us a custom
+error text:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders_dirty</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Key quality check failed for orders-customers join. "</span>,</span>
@@ -145,6 +174,10 @@ hard rather than print warnings. An explicit
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Key quality check failed for orders-customers join. Run join_spy() interactively for details.</span></span></code></pre></div>
+<p>The custom message earns its keep months later, when the error lands
+in a log file at 3 a.m. and whoever reads it has no context. Naming the
+join and pointing at <code><a href="../reference/join_spy.html">join_spy()</a></code> turns a bare
+<code>stopifnot</code> failure into a starting point for diagnosis.</p>
 <p>We can also chain the assertion with a repair step – run
 <code><a href="../reference/key_check.html">key_check()</a></code> first, repair on failure, then re-check:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
@@ -165,12 +198,20 @@ hard rather than print warnings. An explicit
 <span>                       by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span></code></pre></div>
+<p><code><a href="../reference/join_repair.html">join_repair()</a></code> only touches mechanical defects – here,
+trimming whitespace and stripping invisible Unicode characters from the
+key columns. It cannot invent missing customers or decide which of two
+duplicate rows is correct, so the re-check after repair matters: if the
+second <code><a href="../reference/key_check.html">key_check()</a></code> still fails, the problem is structural
+(true duplicates, NA keys) and the script should stop for a human.</p>
 <p><code><a href="../reference/key_check.html">key_check()</a></code> is a binary pass/fail gate;
 <code><a href="../reference/join_spy.html">join_spy()</a></code> builds a full report with match rates, expected
-row counts, and categorized issues. In production,
-<code><a href="../reference/key_check.html">key_check()</a></code> runs on every execution.
-<code><a href="../reference/join_spy.html">join_spy()</a></code> is what we reach for when an assertion fails and
-we need to understand why.</p>
+row counts, and categorized issues. The split mirrors how the checks
+run: <code><a href="../reference/key_check.html">key_check()</a></code> performs the cheap scans and skips the
+heavier analyses such as near-match detection, so it stays affordable on
+every execution. In production, <code><a href="../reference/key_check.html">key_check()</a></code> runs every
+time. <code><a href="../reference/join_spy.html">join_spy()</a></code> is what we reach for when an assertion
+fails and we need to understand why.</p>
 </div>
 <div class="section level2">
 <h2 id="silent-joins-in-pipelines">Silent Joins in Pipelines<a class="anchor" aria-label="anchor" href="#silent-joins-in-pipelines"></a>
@@ -193,13 +234,20 @@ all printed output while still computing the report internally.</p>
 <span></span>
 <span><span class="co"># Nothing printed</span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>The report is still available via <code><a href="../reference/last_report.html">last_report()</a></code>:</p>
+<p><code>.quiet = TRUE</code> overrides <code>verbose</code>, so it wins
+regardless of what a caller passed for <code>verbose</code>. The report
+is computed either way and stored twice: once in the package
+environment, where <code><a href="../reference/last_report.html">last_report()</a></code> finds it, and once as an
+attribute on the returned data frame.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rpt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/last_report.html">last_report</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span></span>
 <span><span class="co">#&gt; [1] 0.75</span></span></code></pre></div>
-<p>The join runs silently; later, we pull the report and check its
-contents programmatically:</p>
+<p>The match rate is the share of unique left-table keys that found a
+partner on the right – here 3 of the 4 sensor IDs, since
+<code>S04</code> has no reading and <code>S05</code> has no sensor. The
+join runs silently; later, we pull the report and check its contents
+programmatically:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">rpt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/last_report.html">last_report</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span> <span class="op">&lt;</span> <span class="fl">0.95</span><span class="op">)</span> <span class="op">{</span></span>
@@ -210,7 +258,8 @@ contents programmatically:</p>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; Warning: Low match rate (75.0%) in sensor join -- check for missing sensor IDs</span></span></code></pre></div>
 <p>The report object is a plain list, so standard R subsetting works for
-arbitrarily complex validation logic.</p>
+arbitrarily complex validation logic. Anything the printed report shows
+is reachable by name; the next section walks the full structure.</p>
 <p>One caveat: <code><a href="../reference/last_report.html">last_report()</a></code> stores only the most recent
 report. If a script performs three joins in sequence, only the third
 report survives. To retain earlier reports, capture them explicitly:</p>
@@ -221,6 +270,123 @@ report survives. To retain earlier reports, capture them explicitly:</p>
 <span><span class="co"># ... later ...</span></span>
 <span><span class="va">result2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/inner_join_spy.html">inner_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">report2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/last_report.html">last_report</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>The same report also travels with the result as an attribute, which
+sidesteps the global state entirely:</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">result1</span>, <span class="st">"join_report"</span><span class="op">)</span>, <span class="va">report1</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p><code>attr(result1, "join_report")</code> returns the report for that
+specific join no matter how many joins ran since. Inside package code or
+functions other people call, the attribute is the safer interface;
+<code><a href="../reference/last_report.html">last_report()</a></code> is a console convenience that happens to also
+work in scripts.</p>
+</div>
+<div class="section level2">
+<h2 id="inspecting-reports-programmatically">Inspecting Reports Programmatically<a class="anchor" aria-label="anchor" href="#inspecting-reports-programmatically"></a>
+</h2>
+<p>Threshold checks like the one above need to know where the numbers
+live. A <code>JoinReport</code> is an S3 object built on a named list,
+and its components map one-to-one onto the sections of the printed
+report:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rpt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders_dirty</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "x_summary"            "y_summary"            "match_analysis"      </span></span>
+<span><span class="co">#&gt; [4] "issues"               "expected_rows"        "by"                  </span></span>
+<span><span class="co">#&gt; [7] "multicolumn_analysis" "memory_estimate"</span></span></code></pre></div>
+<p><code>x_summary</code> and <code>y_summary</code> describe the key
+columns of each table: row count (<code>n_rows</code>), unique keys
+(<code>n_unique</code>), duplicated keys (<code>n_duplicates</code>),
+rows affected by duplication (<code>n_duplicate_rows</code>), and NA
+keys (<code>n_na</code>). <code>match_analysis</code> holds the overlap:
+<code>n_matched</code>, <code>n_left_only</code>,
+<code>n_right_only</code>, and <code>match_rate</code>.
+<code>expected_rows</code> predicts the row count for each join type
+(<code>inner</code>, <code>left</code>, <code>right</code>,
+<code>full</code>), and <code>issues</code> is a list with one entry per
+detected problem. Of the remaining components, <code>by</code> records
+the key, <code>multicolumn_analysis</code> scores each column of a
+composite key separately, and <code>memory_estimate</code> holds
+human-readable result-size estimates per join type.</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rpt</span><span class="op">$</span><span class="va">x_summary</span><span class="op">$</span><span class="va">n_duplicates</span></span>
+<span><span class="co">#&gt; [1] 0</span></span>
+<span><span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span></span>
+<span><span class="co">#&gt; [1] 0.5</span></span>
+<span><span class="va">rpt</span><span class="op">$</span><span class="va">expected_rows</span><span class="op">$</span><span class="va">left</span></span>
+<span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
+<p>The padded IDs cut the match rate to 50% even though neither table
+has a single duplicate. For alerting, three numbers cover most needs:
+the match rate, the issue count, and the expected row count for the join
+type about to run.</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">issues</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 2</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">issues</span>, <span class="kw">function</span><span class="op">(</span><span class="va">i</span><span class="op">)</span> <span class="va">i</span><span class="op">$</span><span class="va">type</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "whitespace" "near_match"</span></span></code></pre></div>
+<p>Each issue is itself a list with a <code>type</code>, a
+<code>severity</code> (<code>"error"</code>, <code>"warning"</code>, or
+<code>"info"</code>), a human-readable <code>message</code>, and usually
+a <code>details</code> element holding the offending values. Filtering
+on severity separates problems that should halt a pipeline from
+observations that belong in a log:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">severities</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">issues</span>, <span class="kw">function</span><span class="op">(</span><span class="va">i</span><span class="op">)</span> <span class="va">i</span><span class="op">$</span><span class="va">severity</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">severities</span></span>
+<span><span class="co">#&gt; [1] "warning" "info"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">severities</span> <span class="op">==</span> <span class="st">"warning"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
+<p>Here the whitespace issue carries <code>"warning"</code> severity
+while the near-match hint is merely <code>"info"</code>. Wrapping the
+thresholds in a function gives the pipeline a single reusable gate:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report_gate</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">rpt</span>, <span class="va">min_match</span> <span class="op">=</span> <span class="fl">0.95</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="../reference/is_join_report.html">is_join_report</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">problems</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span> <span class="op">&lt;</span> <span class="va">min_match</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">problems</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">problems</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span></span>
+<span>      <span class="st">"match rate %.0f%% below %.0f%%"</span>,</span>
+<span>      <span class="fl">100</span> <span class="op">*</span> <span class="va">rpt</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span>, <span class="fl">100</span> <span class="op">*</span> <span class="va">min_match</span></span>
+<span>    <span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">sev</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">issues</span>, <span class="kw">function</span><span class="op">(</span><span class="va">i</span><span class="op">)</span> <span class="va">i</span><span class="op">$</span><span class="va">severity</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/any.html" class="external-link">any</a></span><span class="op">(</span><span class="va">sev</span> <span class="op">==</span> <span class="st">"warning"</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">problems</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">problems</span>, <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%d warning-level issue(s)"</span>,</span>
+<span>                                    <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">sev</span> <span class="op">==</span> <span class="st">"warning"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">problems</span></span>
+<span><span class="op">}</span></span>
+<span></span>
+<span><span class="fu">report_gate</span><span class="op">(</span><span class="va">rpt</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "match rate 50% below 95%" "1 warning-level issue(s)"</span></span></code></pre></div>
+<p><code><a href="../reference/is_join_report.html">is_join_report()</a></code> guards the entry point.
+<code><a href="../reference/last_report.html">last_report()</a></code> returns <code>NULL</code> before any join has
+run, and a half-wired pipeline will happily pass that <code>NULL</code>
+along; failing on the class check localizes the bug to the gate’s
+caller. The returned character vector doubles as the alert body – empty
+means healthy, anything else is the text of the page.</p>
+<p>For metric collection, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> flattens the same
+numbers into a two-column data frame:</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">)</span></span>
+<span><span class="co">#&gt;               metric value</span></span>
+<span><span class="co">#&gt; 1          left_rows   4.0</span></span>
+<span><span class="co">#&gt; 2         right_rows   4.0</span></span>
+<span><span class="co">#&gt; 3   left_unique_keys   4.0</span></span>
+<span><span class="co">#&gt; 4  right_unique_keys   4.0</span></span>
+<span><span class="co">#&gt; 5       keys_matched   2.0</span></span>
+<span><span class="co">#&gt; 6     keys_left_only   2.0</span></span>
+<span><span class="co">#&gt; 7    keys_right_only   2.0</span></span>
+<span><span class="co">#&gt; 8         match_rate   0.5</span></span>
+<span><span class="co">#&gt; 9             issues   2.0</span></span>
+<span><span class="co">#&gt; 10   inner_join_rows   2.0</span></span>
+<span><span class="co">#&gt; 11    left_join_rows   4.0</span></span>
+<span><span class="co">#&gt; 12   right_join_rows   4.0</span></span>
+<span><span class="co">#&gt; 13    full_join_rows   6.0</span></span></code></pre></div>
+<p>That shape suits accumulating one row of metrics per pipeline run or
+writing into a database table;
+<code>summary(rpt, format = "markdown")</code> produces a table for
+inclusion in a rendered report.</p>
 </div>
 <div class="section level2">
 <h2 id="cardinality-guards">Cardinality Guards<a class="anchor" aria-label="anchor" href="#cardinality-guards"></a>
@@ -231,7 +397,7 @@ enforces a cardinality constraint and throws an error if it is
 violated.</p>
 <p>In development, we use <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> to
 understand the actual relationship:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">products</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"P1"</span>, <span class="st">"P2"</span>, <span class="st">"P3"</span><span class="op">)</span>,</span>
 <span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Widget"</span>, <span class="st">"Gadget"</span>, <span class="st">"Gizmo"</span><span class="op">)</span>,</span>
@@ -245,23 +411,26 @@ understand the actual relationship:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/detect_cardinality.html">detect_cardinality</a></span><span class="op">(</span><span class="va">products</span>, <span class="va">line_items</span>, by <span class="op">=</span> <span class="st">"product_id"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"1:m"</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"1:n"</span></span></span>
 <span><span class="co">#&gt; Right duplicates: <span style="color: #0000BB;">2</span> key(s)</span></span></code></pre></div>
 <p>One-to-many: each product appears once in <code>products</code> but
-can appear multiple times in <code>line_items</code>. We encode that
+can appear multiple times in <code>line_items</code>.
+<code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> prints its finding and returns the
+string invisibly, so the same call works interactively and as a value in
+a gate (<code>card &lt;- detect_cardinality(...)</code>). We encode the
 expectation in production:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_strict.html">join_strict</a></span><span class="op">(</span></span>
 <span>  <span class="va">products</span>, <span class="va">line_items</span>,</span>
 <span>  by <span class="op">=</span> <span class="st">"product_id"</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"left"</span>,</span>
-<span>  expect <span class="op">=</span> <span class="st">"1:m"</span></span>
+<span>  expect <span class="op">=</span> <span class="st">"1:n"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">result</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 5</span></span></code></pre></div>
 <p>If someone loads a <code>products</code> table with duplicate product
 IDs, the script fails immediately:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">products_bad</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"P1"</span>, <span class="st">"P1"</span>, <span class="st">"P2"</span>, <span class="st">"P3"</span><span class="op">)</span>,</span>
 <span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Widget"</span>, <span class="st">"Widget v2"</span>, <span class="st">"Gadget"</span>, <span class="st">"Gizmo"</span><span class="op">)</span>,</span>
@@ -272,24 +441,32 @@ IDs, the script fails immediately:</p>
 <span>  <span class="va">products_bad</span>, <span class="va">line_items</span>,</span>
 <span>  by <span class="op">=</span> <span class="st">"product_id"</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"left"</span>,</span>
-<span>  expect <span class="op">=</span> <span class="st">"1:m"</span></span>
+<span>  expect <span class="op">=</span> <span class="st">"1:n"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;">:</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Cardinality violation: expected 1:m but found m:m</span></span>
-<span><span class="co">#&gt;   Left duplicates: 1, Right duplicates: 2</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;"> in `join_strict()`:</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Cardinality violation: expected <span style="color: #0000BB;">"1:n"</span> but found <span style="color: #0000BB;">"n:m"</span>.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Left duplicates: <span style="color: #0000BB;">1</span>, right duplicates: <span style="color: #0000BB;">2</span>.</span></span></code></pre></div>
+<p>This is the classic slow failure made fast. A reference table that
+was clean for two years gains its first duplicate – a vendor file gets
+loaded twice, or a re-run ETL step appends a second copy – and every
+downstream left join starts multiplying rows. Without the guard, the
+symptom is inflated totals in a report some weeks later; with it, the
+run fails the same night, and the error message carries the cause: the
+expected cardinality, the one actually found, and the duplicate counts
+on each side.</p>
 <p>The four cardinality levels:</p>
 <ul>
 <li><p><strong>1:1</strong> – lookup to lookup. Each key appears exactly
 once on both sides.</p></li>
-<li><p><strong>1:m</strong> – reference on the left, transactions on the
+<li><p><strong>1:n</strong> – reference on the left, transactions on the
 right (products to line items, stations to hourly readings).</p></li>
-<li><p><strong>m:1</strong> – transactions on the left, lookup on the
+<li><p><strong>n:1</strong> – transactions on the left, lookup on the
 right (sales joined to a region table).</p></li>
-<li><p><strong>m:m</strong> – duplicates on both sides. Almost always a
-bug; requiring an explicit <code>expect = "m:m"</code> acts as a speed
+<li><p><strong>n:m</strong> – duplicates on both sides. Almost always a
+bug; requiring an explicit <code>expect = "n:m"</code> acts as a speed
 bump.</p></li>
 </ul>
-<p>In practice, <code>"1:m"</code> and <code>"m:1"</code> cover most
+<p>In practice, <code>"1:n"</code> and <code>"n:1"</code> cover most
 production joins. <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> confirms the
 relationship during development; the <code>expect</code> value is then
 hard-coded in the production script.</p>
@@ -297,9 +474,85 @@ hard-coded in the production script.</p>
 about Cartesian product explosion when a key has many duplicates on
 <em>both</em> sides. A join can violate a <code>"1:1"</code> constraint
 without triggering a Cartesian explosion (one extra duplicate is
-enough), and a <code>"m:m"</code> join can produce a massive product
+enough), and a <code>"n:m"</code> join can produce a massive product
 that <code><a href="../reference/join_strict.html">join_strict()</a></code> would allow. The two functions
 complement each other.</p>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">events_a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"E1"</span>, <span class="st">"E2"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>, src <span class="op">=</span> <span class="st">"a"</span>,</span>
+<span>                       stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">events_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"E1"</span>, <span class="st">"E2"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>, src <span class="op">=</span> <span class="st">"b"</span>,</span>
+<span>                       stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">chk</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/check_cartesian.html">check_cartesian</a></span><span class="op">(</span><span class="va">events_a</span>, <span class="va">events_b</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> Cartesian product risk: result will be <span style="color: #0000BB;">20</span>x larger than input</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Worst offending keys</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">"E1"</span>: <span style="color: #0000BB;">20</span> x <span style="color: #0000BB;">20</span> = <span style="color: #0000BB;">400</span> rows</span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">"E2"</span>: <span style="color: #0000BB;">20</span> x <span style="color: #0000BB;">20</span> = <span style="color: #0000BB;">400</span> rows</span></span>
+<span><span class="va">chk</span><span class="op">$</span><span class="va">expansion_factor</span></span>
+<span><span class="co">#&gt; [1] 20</span></span></code></pre></div>
+<p>The return value is a list with <code>has_explosion</code>, the
+<code>expansion_factor</code>, the predicted <code>total_inner</code>
+row count, and a <code>worst_keys</code> data frame naming the keys
+responsible. As a pipeline gate,
+<code>if (chk$has_explosion) stop(...)</code> catches the blow-up before
+the join allocates the memory. The 20x factor here turns a 40-row input
+into an 800-row result; the same arithmetic on a million-row table is
+what fills a server’s RAM at 2 a.m.</p>
+</div>
+<div class="section level2">
+<h2 id="testing-join-contracts-with-testthat">Testing Join Contracts with testthat<a class="anchor" aria-label="anchor" href="#testing-join-contracts-with-testthat"></a>
+</h2>
+<p>The gates so far run when the pipeline runs. A second line of defense
+runs when the code changes: unit tests that pin down the join contracts
+– which columns join which tables, at what cardinality, with what key
+quality. These contracts rarely appear in documentation; they live in
+the heads of whoever wrote the pipeline. Encoding them as testthat
+expectations lets them survive refactors and staff turnover.</p>
+<p>Since <code><a href="../reference/key_check.html">key_check()</a></code> returns a logical and
+<code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> returns a string, both drop straight
+into expectations:</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://testthat.r-lib.org" class="external-link">testthat</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_that.html" class="external-link">test_that</a></span><span class="op">(</span><span class="st">"orders join customers cleanly on customer_id"</span>, <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://testthat.r-lib.org/reference/logical-expectations.html" class="external-link">expect_true</a></span><span class="op">(</span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Test passed with 1 success 🥇</span>.</span></span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_that.html" class="external-link">test_that</a></span><span class="op">(</span><span class="st">"products to line_items is one-to-many"</span>, <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://testthat.r-lib.org/reference/equality-expectations.html" class="external-link">expect_identical</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="../reference/detect_cardinality.html">detect_cardinality</a></span><span class="op">(</span><span class="va">products</span>, <span class="va">line_items</span>, by <span class="op">=</span> <span class="st">"product_id"</span><span class="op">)</span>,</span>
+<span>    <span class="st">"1:n"</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="co">#&gt; i Detected cardinality: "1:n"</span></span>
+<span><span class="co">#&gt; Right duplicates: 2 key(s)</span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Test passed with 1 success 🎊</span>.</span></span></code></pre></div>
+<p>The cardinality test is the one that pays off. Cardinality violations
+come from data, and data changes without commits; running this test
+against a fresh extract in CI, or on a schedule, catches the first
+duplicate product before the nightly join multiplies line items. A third
+useful contract is row preservation, written against the prediction in
+the report:</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://testthat.r-lib.org/reference/test_that.html" class="external-link">test_that</a></span><span class="op">(</span><span class="st">"left join is predicted to preserve order rows"</span>, <span class="op">{</span></span>
+<span>  <span class="va">rpt</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://testthat.r-lib.org/reference/equality-expectations.html" class="external-link">expect_equal</a></span><span class="op">(</span><span class="va">rpt</span><span class="op">$</span><span class="va">expected_rows</span><span class="op">$</span><span class="va">left</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">orders</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Test passed with 1 success 🌈</span>.</span></span></code></pre></div>
+<p><code>expected_rows$left</code> equals <code>nrow(orders)</code>
+exactly when no left key matches a duplicated right key, so this single
+expectation encodes “the enrichment join does not multiply rows” without
+running the join. In a package or pipeline repository these tests live
+in <code>tests/testthat/test-join-contracts.R</code> and run with
+everything else under <code><a href="https://testthat.r-lib.org/reference/test_dir.html" class="external-link">testthat::test_dir()</a></code> or
+<code>R CMD check</code>. What data they point at is the design
+decision: against committed fixture files they test the code’s
+assumptions; against a small fresh extract they test the data itself,
+which makes them a scheduled data-quality job wearing a unit-test
+interface.</p>
 </div>
 <div class="section level2">
 <h2 id="logging-and-audit-trails">Logging and Audit Trails<a class="anchor" aria-label="anchor" href="#logging-and-audit-trails"></a>
@@ -308,29 +561,32 @@ complement each other.</p>
 <h3 id="manual-logging">Manual logging<a class="anchor" aria-label="anchor" href="#manual-logging"></a>
 </h3>
 <p><code><a href="../reference/log_report.html">log_report()</a></code> writes a single report to a file. The
-format depends on the file extension:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+format depends on the file extension: <code>.txt</code> and
+<code>.log</code> produce human-readable text, <code>.json</code>
+produces machine-readable JSON, and <code>.rds</code> saves the complete
+R object.</p>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Text format -- human-readable</span></span>
 <span><span class="va">txt_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">txt_log</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:/Temp\Rtmp2BnYNR\file31bf43ca12605.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c81eac436.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">txt_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Logged: 2026-03-31 23:21:09</span></span>
+<span><span class="co">#&gt; Logged: 2026-06-13 00:54:08</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Left Table (x):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Right Table (y):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Match Analysis:</span></span>
@@ -349,24 +605,33 @@ format depends on the file extension:</p>
 <span><span class="co">#&gt;   near_match: 1</span></span>
 <span><span class="co">#&gt; ============================================================</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">txt_log</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<p>The text entry mirrors the printed report – key column, per-table
+summaries, match analysis, expected rows per join type, and an issue
+tally – with a separator line so consecutive entries stay readable in
+one file. By default <code><a href="../reference/log_report.html">log_report()</a></code> overwrites;
+<code>append = TRUE</code> adds to the end (text and log formats only),
+and the timestamp written with each entry means a grep for a date range
+works on the raw file.</p>
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># JSON format -- machine-readable</span></span>
 <span><span class="va">json_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">json_log</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:/Temp\Rtmp2BnYNR\file31bf41787369d.json</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c879c668d5.json</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; {</span></span>
 <span><span class="co">#&gt;   "by": "sensor_id",</span></span>
 <span><span class="co">#&gt;   "x_summary": {</span></span>
 <span><span class="co">#&gt;   "n_rows": 4,</span></span>
 <span><span class="co">#&gt;   "n_unique": 4,</span></span>
-<span><span class="co">#&gt;   "n_duplicated": null,</span></span>
+<span><span class="co">#&gt;   "n_duplicates": 0,</span></span>
+<span><span class="co">#&gt;   "n_duplicate_rows": 0,</span></span>
 <span><span class="co">#&gt;   "n_na": 0</span></span>
 <span><span class="co">#&gt; },</span></span>
 <span><span class="co">#&gt;   "y_summary": {</span></span>
 <span><span class="co">#&gt;   "n_rows": 4,</span></span>
 <span><span class="co">#&gt;   "n_unique": 4,</span></span>
-<span><span class="co">#&gt;   "n_duplicated": null,</span></span>
+<span><span class="co">#&gt;   "n_duplicates": 0,</span></span>
+<span><span class="co">#&gt;   "n_duplicate_rows": 0,</span></span>
 <span><span class="co">#&gt;   "n_na": 0</span></span>
 <span><span class="co">#&gt; },</span></span>
 <span><span class="co">#&gt;   "match_analysis": {</span></span>
@@ -383,13 +648,17 @@ format depends on the file extension:</p>
 <span><span class="co">#&gt; },</span></span>
 <span><span class="co">#&gt;   "n_issues": 1,</span></span>
 <span><span class="co">#&gt;   "issue_types": "near_match",</span></span>
-<span><span class="co">#&gt;   "logged_at": "2026-03-31 23:21:09"</span></span>
+<span><span class="co">#&gt;   "logged_at": "2026-06-13 00:54:08"</span></span>
 <span><span class="co">#&gt; }</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span></span></code></pre></div>
 <p>Text format works for tailing logs during a batch run; JSON format
 feeds into monitoring systems or downstream scripts. Reports can also be
 saved as <code>.rds</code> files, which preserves the full R object for
-later interactive inspection.</p>
+later interactive inspection. The <code>.rds</code> route matters when
+the issues themselves need preserving: text and JSON record issue counts
+and types, while the RDS file keeps each issue’s <code>details</code>
+element – the actual offending key values – which is what we want in
+front of us when reconstructing what went wrong last Tuesday.</p>
 </div>
 <div class="section level3">
 <h3 id="automatic-logging">Automatic logging<a class="anchor" aria-label="anchor" href="#automatic-logging"></a>
@@ -398,10 +667,10 @@ later interactive inspection.</p>
 is cleaner than calling <code><a href="../reference/log_report.html">log_report()</a></code> after each one. Every
 subsequent <code>*_join_spy()</code> call appends its report to the
 file.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">auto_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">auto_log</span>, format <span class="op">=</span> <span class="st">"text"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:/Temp\Rtmp2BnYNR\file31bf429b81d46.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c83a2c1fc1.log</span></span></span>
 <span></span>
 <span><span class="co"># These joins are automatically logged</span></span>
 <span><span class="va">result1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -410,20 +679,20 @@ file.</p>
 <span><span class="co"># Check what got logged</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">auto_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-03-31 23:21:09</span></span>
+<span><span class="co">#&gt; Logged: 2026-06-13 00:54:08</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Left Table (x):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Right Table (y):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Match Analysis:</span></span>
@@ -442,20 +711,20 @@ file.</p>
 <span><span class="co">#&gt;   near_match: 1</span></span>
 <span><span class="co">#&gt; ============================================================</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-03-31 23:21:09</span></span>
+<span><span class="co">#&gt; Logged: 2026-06-13 00:54:08</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Left Table (x):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Right Table (y):</span></span>
 <span><span class="co">#&gt;   Rows: 4</span></span>
 <span><span class="co">#&gt;   Unique keys: 4</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Match Analysis:</span></span>
@@ -478,6 +747,21 @@ file.</p>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging disabled</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">auto_log</span><span class="op">)</span></span></code></pre></div>
+<p>Each wrapper call appends one entry, so the file accumulates a
+join-by-join history of the run even when every join is
+<code>.quiet</code>. <code><a href="../reference/set_log_file.html">set_log_file()</a></code> returns the previous
+setting invisibly, which lets a function enable logging for its own
+joins and then put back whatever the caller had configured:</p>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fn_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
+<span><span class="va">previous</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">fn_log</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c815f5639e.log</span></span></span>
+<span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">previous</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging disabled</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">fn_log</span><span class="op">)</span></span></code></pre></div>
 <p>Automatic logging only triggers from <code>*_join_spy()</code>
 wrappers. <code><a href="../reference/join_strict.html">join_strict()</a></code> and bare <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> calls
 are not logged – the wrappers are the instrumented path. To combine
@@ -485,8 +769,10 @@ cardinality enforcement with logging, run
 <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> as a separate check and use a
 <code>*_join_spy()</code> wrapper for the actual join.</p>
 <p><code><a href="../reference/get_log_file.html">get_log_file()</a></code> returns the current log path (or
-<code>NULL</code> if logging is disabled):</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code>NULL</code> if logging is disabled), which is useful inside
+helpers that should log only when the surrounding pipeline asked for
+it:</p>
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Only log if logging is configured</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_log_file.html">get_log_file</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">message</a></span><span class="op">(</span><span class="st">"Logging is active at: "</span>, <span class="fu"><a href="../reference/get_log_file.html">get_log_file</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
@@ -494,12 +780,150 @@ cardinality enforcement with logging, run
 </div>
 </div>
 <div class="section level2">
+<h2 id="reading-json-logs-downstream">Reading JSON Logs Downstream<a class="anchor" aria-label="anchor" href="#reading-json-logs-downstream"></a>
+</h2>
+<p>The JSON format exists for consumers that are not R: a dashboard, a
+cron wrapper in Python, a shell script that greps last night’s log.
+joinspy serializes reports with an internal base-R writer, so the
+package carries no JSON dependency, and the output is plain JSON that
+any parser reads. Each entry records the join key, both table summaries,
+the match analysis, the expected row counts, the issue count and types,
+and a timestamp.</p>
+<p>Each report is appended as its own object, so the file is a sequence
+of JSON objects; line-oriented tools work on it directly, and a full
+parser reads it one object at a time. Reading it back in R needs nothing
+beyond base functions, so we log two joins and then play the part of the
+monitoring script:</p>
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">json_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">json_log</span>, format <span class="op">=</span> <span class="st">"json"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c8183302d.json</span></span></span>
+<span></span>
+<span><span class="va">r1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">r2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/inner_join_spy.html">inner_join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging disabled</span></span></code></pre></div>
+<p>The monitoring side reads the file, finds the lines carrying the
+field it cares about, and extracts the values:</p>
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">log_lines</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span></span>
+<span><span class="va">rate_lines</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">'"match_rate"'</span>, <span class="va">log_lines</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">rate_lines</span></span>
+<span><span class="co">#&gt; [1] "  \"match_rate\": 0.75" "  \"match_rate\": 1"</span></span></code></pre></div>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">rates</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">sub</a></span><span class="op">(</span><span class="st">'.*"match_rate": *([0-9.]+).*'</span>, <span class="st">"\\1"</span>, <span class="va">rate_lines</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">rates</span></span>
+<span><span class="co">#&gt; [1] 0.75 1.00</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">rates</span> <span class="op">&lt;</span> <span class="fl">0.95</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span></span></code></pre></div>
+<p>The sensor join logged its 75% match rate, the order join a clean
+100%, and the threshold flags entry one. The same extract pattern works
+on <code>"n_issues"</code> for issue-count alerting. It also works on
+<code>"logged_at"</code> for staleness checks – a pipeline whose newest
+log entry is two days old has a different problem than a pipeline
+logging failures, and the timestamp catches it. For richer processing,
+any JSON library parses the entries one object at a time; the field
+names match the report components walked through earlier, so a script
+written against the JSON and a script written against
+<code><a href="../reference/last_report.html">last_report()</a></code> read the same vocabulary.</p>
+</div>
+<div class="section level2">
+<h2 id="diagnosing-a-multi-join-pipeline">Diagnosing a Multi-Join Pipeline<a class="anchor" aria-label="anchor" href="#diagnosing-a-multi-join-pipeline"></a>
+</h2>
+<p>Real pipelines chain joins: orders pick up customer attributes,
+customers pick up regions, regions pick up targets. When the final table
+has the wrong row count, the offending join could be any of them, and
+checking each one by hand means re-running the pipeline step by step.
+<code><a href="../reference/analyze_join_chain.html">analyze_join_chain()</a></code> does that walk in one call – it takes
+a named list of tables and a list of join specifications, runs
+<code><a href="../reference/join_spy.html">join_spy()</a></code> at every step, carries the intermediate result
+forward with a left join, and prints a per-step summary.</p>
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">orders_chain</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  order_id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>,</span>
+<span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"C1"</span>, <span class="st">"C2"</span>, <span class="st">"C2"</span>, <span class="st">"C3"</span>, <span class="st">"C4"</span>, <span class="st">"C4"</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">customers_chain</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"C1"</span>, <span class="st">"C2"</span>, <span class="st">"C3"</span>, <span class="st">"C4"</span><span class="op">)</span>,</span>
+<span>  region_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"R1"</span>, <span class="st">"R1"</span>, <span class="st">"R2"</span>, <span class="st">"R3"</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">regions</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  region_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"R1"</span>, <span class="st">"R2"</span><span class="op">)</span>,</span>
+<span>  region_name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North"</span>, <span class="st">"South"</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">chain</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/analyze_join_chain.html">analyze_join_chain</a></span><span class="op">(</span></span>
+<span>  tables <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>orders <span class="op">=</span> <span class="va">orders_chain</span>, customers <span class="op">=</span> <span class="va">customers_chain</span>,</span>
+<span>                regions <span class="op">=</span> <span class="va">regions</span><span class="op">)</span>,</span>
+<span>  joins <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>left <span class="op">=</span> <span class="st">"orders"</span>, right <span class="op">=</span> <span class="st">"customers"</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>left <span class="op">=</span> <span class="st">"result"</span>, right <span class="op">=</span> <span class="st">"regions"</span>, by <span class="op">=</span> <span class="st">"region_id"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Chain Analysis</span> <span style="color: #00BBBB;">─────────────────────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Step 1: orders + customers</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left: <span style="color: #0000BB;">6</span> rows</span></span>
+<span><span class="co">#&gt; Right: <span style="color: #0000BB;">4</span> rows</span></span>
+<span><span class="co">#&gt; Match rate: <span style="color: #0000BB;">100</span>%</span></span>
+<span><span class="co">#&gt; Expected result: <span style="color: #0000BB;">6</span> rows (left join)</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">1</span> issue(s) detected</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Step 2: result + regions</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left: <span style="color: #0000BB;">6</span> rows</span></span>
+<span><span class="co">#&gt; Right: <span style="color: #0000BB;">2</span> rows</span></span>
+<span><span class="co">#&gt; Match rate: <span style="color: #0000BB;">66.7</span>%</span></span>
+<span><span class="co">#&gt; Expected result: <span style="color: #0000BB;">6</span> rows (left join)</span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> <span style="color: #0000BB;">1</span> issue(s) detected</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Chain Summary</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Total issues across chain: <span style="color: #0000BB;">2</span></span></span></code></pre></div>
+<p>The literal name <code>"result"</code> refers to the accumulated
+output of the previous steps, so chains of any length need only that one
+keyword. Step 1 reports the order-side duplicates, which are expected
+for transaction data joining a lookup. The real finding is at step 2,
+where the match rate drops: region <code>"R3"</code> exists in the
+customer table and has no row in <code>regions</code>. That is the kind
+of fact that hides for months in a three-join pipeline, because each
+individual join “works”.</p>
+<p>The return value is a list with one entry per step, each holding the
+table names, the <code>by</code> columns, and the full
+<code>JoinReport</code>, so everything from the programmatic-inspection
+section applies per step:</p>
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">chain</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">report</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">match_rate</span></span>
+<span><span class="co">#&gt; [1] 0.6666667</span></span>
+<span><span class="va">chain</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">report</span><span class="op">$</span><span class="va">match_analysis</span><span class="op">$</span><span class="va">left_only_keys</span></span>
+<span><span class="co">#&gt; [1] "R3"</span></span></code></pre></div>
+<p>A chain-level gate reduces to one vector:</p>
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">chain</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">s</span><span class="op">$</span><span class="va">report</span><span class="op">$</span><span class="va">issues</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">integer</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1 1</span></span></code></pre></div>
+<p>In production we run the chain analysis at deployment time and
+whenever an upstream schema changes. Since it performs each intermediate
+left join to feed the next step, its cost is comparable to running the
+pipeline’s joins once, which makes it a pre-flight and post-incident
+tool; the per-run gates stay with <code><a href="../reference/key_check.html">key_check()</a></code> and
+<code><a href="../reference/join_strict.html">join_strict()</a></code>.</p>
+</div>
+<div class="section level2">
 <h2 id="sampling-for-large-datasets">Sampling for Large Datasets<a class="anchor" aria-label="anchor" href="#sampling-for-large-datasets"></a>
 </h2>
 <p>The <code>sample</code> parameter in <code><a href="../reference/join_spy.html">join_spy()</a></code> runs the
 analysis on a random subset while the actual join (via a
 <code>*_join_spy()</code> wrapper) still operates on the full data.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Simulate a large dataset</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
 <span><span class="va">big_orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -517,19 +941,38 @@ analysis on a random subset while the actual join (via a
 <span><span class="co"># Full analysis</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">report_full</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    user  system elapsed </span></span>
-<span><span class="co">#&gt;    0.11    0.06    0.18</span></span>
+<span><span class="co">#&gt;    0.19    0.03    0.26</span></span>
 <span></span>
 <span><span class="co"># Sampled analysis</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">report_sampled</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>,</span>
 <span>                                        by <span class="op">=</span> <span class="st">"customer_id"</span>, sample <span class="op">=</span> <span class="fl">5000</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    user  system elapsed </span></span>
-<span><span class="co">#&gt;    0.09    0.00    0.09</span></span></code></pre></div>
+<span><span class="co">#&gt;    0.12    0.00    0.11</span></span></code></pre></div>
+<p>The sampled report records its own provenance in
+<code>report$sampling</code> – the sample size and the original row
+counts – and the printed report flags it, so a log reader can tell
+estimated diagnostics from exact ones:</p>
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">report_sampled</span><span class="op">$</span><span class="va">sampling</span></span>
+<span><span class="co">#&gt; $sampled</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $original_x_rows</span></span>
+<span><span class="co">#&gt; [1] 50000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $original_y_rows</span></span>
+<span><span class="co">#&gt; [1] 6000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $sample_size</span></span>
+<span><span class="co">#&gt; [1] 5000</span></span></code></pre></div>
 <p>The sampled report is approximate – match rates and duplicate counts
 are estimated from the subset. For production monitoring, we typically
 care whether the match rate is roughly 95% or roughly 60%, not whether
 it is 94.7% or 95.1%. Sampling catches systemic problems (wrong key
 column, widespread encoding issues, duplicate explosion) with a fraction
-of the runtime.</p>
+of the runtime. A <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code> ahead of the call makes the
+sampled diagnostic reproducible, which keeps two runs on identical data
+from flapping between alert and no alert.</p>
 <p>Sampling can miss rare issues. If 0.1% of keys have a zero-width
 space, a 5,000-row sample from a 10-million-row table might not include
 any. Running full diagnostics periodically (weekly, or when the upstream
@@ -542,7 +985,7 @@ thoroughness.</p>
 <p>Here is a realistic production workflow: a nightly job loads order
 and customer data, validates keys, repairs if needed, joins with
 cardinality enforcement, and logs everything.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># ============================================================</span></span>
 <span><span class="co"># Nightly order enrichment pipeline</span></span>
 <span><span class="co"># ============================================================</span></span>
@@ -550,7 +993,7 @@ cardinality enforcement, and logs everything.</p>
 <span><span class="co"># --- Setup logging ---</span></span>
 <span><span class="va">pipeline_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">pipeline_log</span>, format <span class="op">=</span> <span class="st">"text"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:/Temp\Rtmp2BnYNR\file31bf4120083b.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c88b665f5.log</span></span></span>
 <span></span>
 <span><span class="co"># --- Load data (simulated) ---</span></span>
 <span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -586,12 +1029,12 @@ cardinality enforcement, and logs everything.</p>
 <span></span>
 <span><span class="co"># --- Gate 2: cardinality check ---</span></span>
 <span><span class="va">card</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/detect_cardinality.html">detect_cardinality</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"m:1"</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"n:1"</span></span></span>
 <span><span class="co">#&gt; Left duplicates: <span style="color: #0000BB;">1</span> key(s)</span></span>
-<span><span class="kw">if</span> <span class="op">(</span><span class="va">card</span> <span class="op">==</span> <span class="st">"m:m"</span><span class="op">)</span> <span class="op">{</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="va">card</span> <span class="op">==</span> <span class="st">"n:m"</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">pipeline_log</span><span class="op">)</span></span>
-<span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Unexpected m:m cardinality in orders-customers join"</span>, call. <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span>  <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Unexpected n:m cardinality in orders-customers join"</span>, call. <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="co"># --- Join (with auto-logging via *_join_spy) ---</span></span>
@@ -623,20 +1066,20 @@ cardinality enforcement, and logs everything.</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">pipeline_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-03-31 23:21:10</span></span>
+<span><span class="co">#&gt; Logged: 2026-06-13 00:54:09</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: customer_id</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Left Table (x):</span></span>
 <span><span class="co">#&gt;   Rows: 6</span></span>
 <span><span class="co">#&gt;   Unique keys: 5</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 1</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Right Table (y):</span></span>
 <span><span class="co">#&gt;   Rows: 6</span></span>
 <span><span class="co">#&gt;   Unique keys: 6</span></span>
-<span><span class="co">#&gt;   Duplicated keys: </span></span>
+<span><span class="co">#&gt;   Duplicated keys: 0</span></span>
 <span><span class="co">#&gt;   NA keys: 0</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Match Analysis:</span></span>
@@ -659,13 +1102,75 @@ cardinality enforcement, and logs everything.</p>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging disabled</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">pipeline_log</span><span class="op">)</span></span></code></pre></div>
-<p>The three gates catch different failure modes:
-<code><a href="../reference/key_check.html">key_check()</a></code> catches string-level problems and attempts
-repair, <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> halts on unexpected
-many-to-many relationships, and the row count check guards against
-anything the first two gates missed. Logging runs throughout because
-<code><a href="../reference/set_log_file.html">set_log_file()</a></code> was called at the top. The structure scales
-– more tables, more gates, more joins, same pattern.</p>
+<p>The three gates catch different failure modes. Gate 1 catches
+string-level problems and repairs the mechanical ones; in this run it
+finds the padded <code>"C002 "</code> and trims it, so that customer
+keeps its name and tier in the enriched output. Gate 2 halts on the one
+structural problem repair cannot touch: an unexpected many-to-many
+relationship, the kind that multiplies rows. Gate 3 is the catch-all – a
+left join returning fewer rows than its left table means something went
+wrong at a level the key diagnostics do not see, such as an upstream
+filter applied to the wrong object. Logging runs throughout because
+<code><a href="../reference/set_log_file.html">set_log_file()</a></code> was called at the top, so even a run that
+dies at gate 3 leaves a record of the join that preceded the death.</p>
+<p>Equally deliberate is what the pattern does not check. It never
+verifies that <code>customer_id</code> is the right column to join on; a
+clean key on the wrong column passes every gate. It enforces no
+match-rate floor, so orders for customers missing from the reference
+table sail through with <code>NA</code> names – adding a fourth gate on
+<code>last_report()$match_analysis$match_rate</code> covers that case
+when unmatched keys count as failures for the job at hand. And it
+validates keys only: a corrupted <code>amount</code> column is invisible
+to every check here, which is why these gates complement value-level
+validation tools rather than replace them.</p>
+<p>The pattern stops scaling somewhere around a dozen joins. At that
+point the gate blocks become copy-paste boilerplate, the thresholds
+belong in a config file, and the per-join logic wants to be a function
+taking two tables, a key, and an expected cardinality. Past that, a
+pipeline framework such as <code>targets</code> is the better skeleton,
+with these same checks living inside each node. The log file also grows
+without bound under a daily schedule; naming it by date
+(<code>sprintf("enrich-%s.log", Sys.Date())</code>) keeps each day’s
+audit trail separate and bounded.</p>
+</div>
+<div class="section level2">
+<h2 id="the-cost-of-diagnostics">The Cost of Diagnostics<a class="anchor" aria-label="anchor" href="#the-cost-of-diagnostics"></a>
+</h2>
+<p>Every gate adds runtime, and on a 50,000-row join it is worth seeing
+how much. We time the bare join, the instrumented wrapper, and the cheap
+gate on the tables from the sampling section:</p>
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">t_merge</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">t_spy</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">t_check</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, warn <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span>merge <span class="op">=</span> <span class="va">t_merge</span>, left_join_spy <span class="op">=</span> <span class="va">t_spy</span>, key_check <span class="op">=</span> <span class="va">t_check</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span></span>
+<span><span class="co">#&gt;               user.self sys.self elapsed</span></span>
+<span><span class="co">#&gt; merge              0.14     0.03    0.18</span></span>
+<span><span class="co">#&gt; left_join_spy      0.72     0.09    0.84</span></span>
+<span><span class="co">#&gt; key_check          0.05     0.00    0.05</span></span></code></pre></div>
+<p>The gap between <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and <code><a href="../reference/left_join_spy.html">left_join_spy()</a></code>
+is the full diagnostic: key summaries, match analysis, row-count
+prediction, and the string scans. The scans are vectorized, and the one
+quadratic piece – near-match detection – is capped at 50 unmatched keys
+against 100 candidates regardless of table size, so the diagnostic cost
+grows roughly linearly with the number of unique keys.
+<code><a href="../reference/key_check.html">key_check()</a></code> runs the cheap subset only, which is why it can
+sit in front of every join in a script.</p>
+<p>When the elapsed column stops looking ignorable – tables in the tens
+of millions of rows, or a join inside a tight loop – the fallback order
+is: keep <code><a href="../reference/key_check.html">key_check()</a></code> on every run, move the full
+<code><a href="../reference/join_spy.html">join_spy()</a></code> diagnostic to a <code>sample =</code> run, and
+reserve the unsampled analysis for a weekly job or for the morning after
+an alert. The numbers above are the budget conversation in miniature:
+the gate costs a fraction of the join it protects, and the sampling
+section shows how to hold that fraction steady as the tables grow.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

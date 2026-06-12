@@ -7,11 +7,29 @@ join problems surface as errors or log entries. Every example uses
 synthetic data and [`tempfile()`](https://rdrr.io/r/base/tempfile.html)
 paths, so the whole thing runs end to end.
 
+Production here means any context where nobody watches the console: cron
+jobs, CI runs, scheduled reports, Shiny back ends, `targets` pipelines.
+The failure mode is depressingly uniform. An upstream table gains a
+duplicate key or a whitespace-padded ID, the join silently multiplies or
+drops rows, and the numbers in the final report drift. Weeks can pass
+before anyone traces the drift back to the join, and by then the bad
+rows have propagated into every table built on top of it. The tools
+below convert that slow, silent failure into a loud, immediate one: a
+non-zero exit status the scheduler flags, a log entry a monitoring
+script picks up, or a failed unit test in CI.
+
+We work through the pieces in increasing order of machinery – hard
+assertions, silent instrumented joins, programmatic report inspection,
+cardinality guards, unit tests for join contracts, logging, multi-join
+chain analysis, and finally what all of this costs at runtime.
+
 ## Assertions with key_check()
 
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
 returns a single logical – `TRUE` if no issues were detected, `FALSE`
-otherwise. The simplest assertion wraps it in
+otherwise. Behind that logical sit four scans: duplicate keys, NA keys,
+leading or trailing whitespace, and case mismatches between the two
+tables. The simplest assertion wraps it in
 [`stopifnot()`](https://rdrr.io/r/base/stopifnot.html):
 
 ``` r
@@ -32,6 +50,14 @@ customers <- data.frame(
 stopifnot(key_check(orders, customers, by = "customer_id", warn = FALSE))
 ```
 
+An assertion this cheap can run on every execution. When it passes, it
+adds nothing to the log; when it fails,
+[`stopifnot()`](https://rdrr.io/r/base/stopifnot.html) raises an error,
+the script exits with a non-zero status, and the scheduler marks the run
+as failed. That exit status is what makes the pattern work: cron, GitHub
+Actions, and Airflow all key their alerting off it, so a failed key
+check becomes a notification without any extra plumbing.
+
 When the keys have problems, the script halts:
 
 ``` r
@@ -47,9 +73,15 @@ stopifnot(key_check(orders_dirty, customers, by = "customer_id", warn = FALSE))
 #> ! key_check(orders_dirty, customers, by = "customer_id", warn = FALSE) is not TRUE
 ```
 
-With `warn = FALSE`, the printed diagnostics are suppressed – in a cron
-job or CI pipeline, we want the script to fail hard rather than print
-warnings. An explicit `if`/`stop` gives us a custom error message:
+The two padded IDs (`"C02 "` and `"C03 "`) would silently fail to match
+in a left join – the rows survive, the customer columns come back `NA`,
+and downstream aggregation quietly treats them as customerless orders.
+Halting at the check, before the join runs, keeps the bad rows out of
+everything built afterwards.
+
+With `warn = FALSE`, the printed diagnostics are suppressed; in a cron
+job or CI pipeline, the hard failure is the message. An explicit
+`if`/`stop` gives us a custom error text:
 
 ``` r
 
@@ -60,6 +92,12 @@ if (!key_check(orders_dirty, customers, by = "customer_id", warn = FALSE)) {
 #> Error:
 #> ! Key quality check failed for orders-customers join. Run join_spy() interactively for details.
 ```
+
+The custom message earns its keep months later, when the error lands in
+a log file at 3 a.m. and whoever reads it has no context. Naming the
+join and pointing at
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+turns a bare `stopifnot` failure into a starting point for diagnosis.
 
 We can also chain the assertion with a repair step – run
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
@@ -86,13 +124,26 @@ if (!ok) {
 #> ✔ Repaired 2 value(s)
 ```
 
+[`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.md)
+only touches mechanical defects – here, trimming whitespace and
+stripping invisible Unicode characters from the key columns. It cannot
+invent missing customers or decide which of two duplicate rows is
+correct, so the re-check after repair matters: if the second
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+still fails, the problem is structural (true duplicates, NA keys) and
+the script should stop for a human.
+
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
 is a binary pass/fail gate;
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
 builds a full report with match rates, expected row counts, and
-categorized issues. In production,
+categorized issues. The split mirrors how the checks run:
 [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-runs on every execution.
+performs the cheap scans and skips the heavier analyses such as
+near-match detection, so it stays affordable on every execution. In
+production,
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+runs every time.
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
 is what we reach for when an assertion fails and we need to understand
 why.
@@ -121,8 +172,11 @@ readings <- data.frame(
 result <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 ```
 
-The report is still available via
-[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md):
+`.quiet = TRUE` overrides `verbose`, so it wins regardless of what a
+caller passed for `verbose`. The report is computed either way and
+stored twice: once in the package environment, where
+[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
+finds it, and once as an attribute on the returned data frame.
 
 ``` r
 
@@ -131,8 +185,10 @@ rpt$match_analysis$match_rate
 #> [1] 0.75
 ```
 
-The join runs silently; later, we pull the report and check its contents
-programmatically:
+The match rate is the share of unique left-table keys that found a
+partner on the right – here 3 of the 4 sensor IDs, since `S04` has no
+reading and `S05` has no sensor. The join runs silently; later, we pull
+the report and check its contents programmatically:
 
 ``` r
 
@@ -147,7 +203,8 @@ if (rpt$match_analysis$match_rate < 0.95) {
 ```
 
 The report object is a plain list, so standard R subsetting works for
-arbitrarily complex validation logic.
+arbitrarily complex validation logic. Anything the printed report shows
+is reachable by name; the next section walks the full structure.
 
 One caveat:
 [`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
@@ -164,6 +221,147 @@ report1 <- last_report()
 result2 <- inner_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 report2 <- last_report()
 ```
+
+The same report also travels with the result as an attribute, which
+sidesteps the global state entirely:
+
+``` r
+
+identical(attr(result1, "join_report"), report1)
+#> [1] TRUE
+```
+
+`attr(result1, "join_report")` returns the report for that specific join
+no matter how many joins ran since. Inside package code or functions
+other people call, the attribute is the safer interface;
+[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
+is a console convenience that happens to also work in scripts.
+
+## Inspecting Reports Programmatically
+
+Threshold checks like the one above need to know where the numbers live.
+A `JoinReport` is an S3 object built on a named list, and its components
+map one-to-one onto the sections of the printed report:
+
+``` r
+
+rpt <- join_spy(orders_dirty, customers, by = "customer_id")
+names(rpt)
+#> [1] "x_summary"            "y_summary"            "match_analysis"      
+#> [4] "issues"               "expected_rows"        "by"                  
+#> [7] "multicolumn_analysis" "memory_estimate"
+```
+
+`x_summary` and `y_summary` describe the key columns of each table: row
+count (`n_rows`), unique keys (`n_unique`), duplicated keys
+(`n_duplicates`), rows affected by duplication (`n_duplicate_rows`), and
+NA keys (`n_na`). `match_analysis` holds the overlap: `n_matched`,
+`n_left_only`, `n_right_only`, and `match_rate`. `expected_rows`
+predicts the row count for each join type (`inner`, `left`, `right`,
+`full`), and `issues` is a list with one entry per detected problem. Of
+the remaining components, `by` records the key, `multicolumn_analysis`
+scores each column of a composite key separately, and `memory_estimate`
+holds human-readable result-size estimates per join type.
+
+``` r
+
+rpt$x_summary$n_duplicates
+#> [1] 0
+rpt$match_analysis$match_rate
+#> [1] 0.5
+rpt$expected_rows$left
+#> [1] 4
+```
+
+The padded IDs cut the match rate to 50% even though neither table has a
+single duplicate. For alerting, three numbers cover most needs: the
+match rate, the issue count, and the expected row count for the join
+type about to run.
+
+``` r
+
+length(rpt$issues)
+#> [1] 2
+vapply(rpt$issues, function(i) i$type, character(1))
+#> [1] "whitespace" "near_match"
+```
+
+Each issue is itself a list with a `type`, a `severity` (`"error"`,
+`"warning"`, or `"info"`), a human-readable `message`, and usually a
+`details` element holding the offending values. Filtering on severity
+separates problems that should halt a pipeline from observations that
+belong in a log:
+
+``` r
+
+severities <- vapply(rpt$issues, function(i) i$severity, character(1))
+severities
+#> [1] "warning" "info"
+sum(severities == "warning")
+#> [1] 1
+```
+
+Here the whitespace issue carries `"warning"` severity while the
+near-match hint is merely `"info"`. Wrapping the thresholds in a
+function gives the pipeline a single reusable gate:
+
+``` r
+
+report_gate <- function(rpt, min_match = 0.95) {
+  stopifnot(is_join_report(rpt))
+  problems <- character(0)
+  if (rpt$match_analysis$match_rate < min_match) {
+    problems <- c(problems, sprintf(
+      "match rate %.0f%% below %.0f%%",
+      100 * rpt$match_analysis$match_rate, 100 * min_match
+    ))
+  }
+  sev <- vapply(rpt$issues, function(i) i$severity, character(1))
+  if (any(sev == "warning")) {
+    problems <- c(problems, sprintf("%d warning-level issue(s)",
+                                    sum(sev == "warning")))
+  }
+  problems
+}
+
+report_gate(rpt)
+#> [1] "match rate 50% below 95%" "1 warning-level issue(s)"
+```
+
+[`is_join_report()`](https://gillescolling.com/joinspy/reference/is_join_report.md)
+guards the entry point.
+[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
+returns `NULL` before any join has run, and a half-wired pipeline will
+happily pass that `NULL` along; failing on the class check localizes the
+bug to the gate’s caller. The returned character vector doubles as the
+alert body – empty means healthy, anything else is the text of the page.
+
+For metric collection,
+[`summary()`](https://rdrr.io/r/base/summary.html) flattens the same
+numbers into a two-column data frame:
+
+``` r
+
+summary(rpt)
+#>               metric value
+#> 1          left_rows   4.0
+#> 2         right_rows   4.0
+#> 3   left_unique_keys   4.0
+#> 4  right_unique_keys   4.0
+#> 5       keys_matched   2.0
+#> 6     keys_left_only   2.0
+#> 7    keys_right_only   2.0
+#> 8         match_rate   0.5
+#> 9             issues   2.0
+#> 10   inner_join_rows   2.0
+#> 11    left_join_rows   4.0
+#> 12   right_join_rows   4.0
+#> 13    full_join_rows   6.0
+```
+
+That shape suits accumulating one row of metrics per pipeline run or
+writing into a database table; `summary(rpt, format = "markdown")`
+produces a table for inclusion in a rendered report.
 
 ## Cardinality Guards
 
@@ -191,12 +389,16 @@ line_items <- data.frame(
 )
 
 detect_cardinality(products, line_items, by = "product_id")
-#> ℹ Detected cardinality: "1:m"
+#> ℹ Detected cardinality: "1:n"
 #> Right duplicates: 2 key(s)
 ```
 
 One-to-many: each product appears once in `products` but can appear
-multiple times in `line_items`. We encode that expectation in
+multiple times in `line_items`.
+[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
+prints its finding and returns the string invisibly, so the same call
+works interactively and as a value in a gate
+(`card <- detect_cardinality(...)`). We encode the expectation in
 production:
 
 ``` r
@@ -205,7 +407,7 @@ result <- join_strict(
   products, line_items,
   by = "product_id",
   type = "left",
-  expect = "1:m"
+  expect = "1:n"
 )
 nrow(result)
 #> [1] 5
@@ -226,28 +428,37 @@ join_strict(
   products_bad, line_items,
   by = "product_id",
   type = "left",
-  expect = "1:m"
+  expect = "1:n"
 )
-#> Error:
-#> ! Cardinality violation: expected 1:m but found m:m
-#>   Left duplicates: 1, Right duplicates: 2
+#> Error in `join_strict()`:
+#> ! Cardinality violation: expected "1:n" but found "n:m".
+#> ℹ Left duplicates: 1, right duplicates: 2.
 ```
+
+This is the classic slow failure made fast. A reference table that was
+clean for two years gains its first duplicate – a vendor file gets
+loaded twice, or a re-run ETL step appends a second copy – and every
+downstream left join starts multiplying rows. Without the guard, the
+symptom is inflated totals in a report some weeks later; with it, the
+run fails the same night, and the error message carries the cause: the
+expected cardinality, the one actually found, and the duplicate counts
+on each side.
 
 The four cardinality levels:
 
 - **1:1** – lookup to lookup. Each key appears exactly once on both
   sides.
 
-- **1:m** – reference on the left, transactions on the right (products
+- **1:n** – reference on the left, transactions on the right (products
   to line items, stations to hourly readings).
 
-- **m:1** – transactions on the left, lookup on the right (sales joined
+- **n:1** – transactions on the left, lookup on the right (sales joined
   to a region table).
 
-- **m:m** – duplicates on both sides. Almost always a bug; requiring an
-  explicit `expect = "m:m"` acts as a speed bump.
+- **n:m** – duplicates on both sides. Almost always a bug; requiring an
+  explicit `expect = "n:m"` acts as a speed bump.
 
-In practice, `"1:m"` and `"m:1"` cover most production joins.
+In practice, `"1:n"` and `"n:1"` cover most production joins.
 [`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
 confirms the relationship during development; the `expect` value is then
 hard-coded in the production script.
@@ -256,10 +467,102 @@ hard-coded in the production script.
 solves a different problem: it warns about Cartesian product explosion
 when a key has many duplicates on *both* sides. A join can violate a
 `"1:1"` constraint without triggering a Cartesian explosion (one extra
-duplicate is enough), and a `"m:m"` join can produce a massive product
+duplicate is enough), and a `"n:m"` join can produce a massive product
 that
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
 would allow. The two functions complement each other.
+
+``` r
+
+events_a <- data.frame(id = rep(c("E1", "E2"), each = 20), src = "a",
+                       stringsAsFactors = FALSE)
+events_b <- data.frame(id = rep(c("E1", "E2"), each = 20), src = "b",
+                       stringsAsFactors = FALSE)
+
+chk <- check_cartesian(events_a, events_b, by = "id")
+#> ✖ Cartesian product risk: result will be 20x larger than input
+#> 
+#> ── Worst offending keys ──
+#> 
+#> "E1": 20 x 20 = 400 rows
+#> "E2": 20 x 20 = 400 rows
+chk$expansion_factor
+#> [1] 20
+```
+
+The return value is a list with `has_explosion`, the `expansion_factor`,
+the predicted `total_inner` row count, and a `worst_keys` data frame
+naming the keys responsible. As a pipeline gate,
+`if (chk$has_explosion) stop(...)` catches the blow-up before the join
+allocates the memory. The 20x factor here turns a 40-row input into an
+800-row result; the same arithmetic on a million-row table is what fills
+a server’s RAM at 2 a.m.
+
+## Testing Join Contracts with testthat
+
+The gates so far run when the pipeline runs. A second line of defense
+runs when the code changes: unit tests that pin down the join contracts
+– which columns join which tables, at what cardinality, with what key
+quality. These contracts rarely appear in documentation; they live in
+the heads of whoever wrote the pipeline. Encoding them as testthat
+expectations lets them survive refactors and staff turnover.
+
+Since
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+returns a logical and
+[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
+returns a string, both drop straight into expectations:
+
+``` r
+
+library(testthat)
+
+test_that("orders join customers cleanly on customer_id", {
+  expect_true(key_check(orders, customers, by = "customer_id", warn = FALSE))
+})
+#> Test passed with 1 success 🥇.
+```
+
+``` r
+
+test_that("products to line_items is one-to-many", {
+  expect_identical(
+    detect_cardinality(products, line_items, by = "product_id"),
+    "1:n"
+  )
+})
+#> i Detected cardinality: "1:n"
+#> Right duplicates: 2 key(s)
+#> Test passed with 1 success 🎊.
+```
+
+The cardinality test is the one that pays off. Cardinality violations
+come from data, and data changes without commits; running this test
+against a fresh extract in CI, or on a schedule, catches the first
+duplicate product before the nightly join multiplies line items. A third
+useful contract is row preservation, written against the prediction in
+the report:
+
+``` r
+
+test_that("left join is predicted to preserve order rows", {
+  rpt <- join_spy(orders, customers, by = "customer_id")
+  expect_equal(rpt$expected_rows$left, nrow(orders))
+})
+#> Test passed with 1 success 🌈.
+```
+
+`expected_rows$left` equals `nrow(orders)` exactly when no left key
+matches a duplicated right key, so this single expectation encodes “the
+enrichment join does not multiply rows” without running the join. In a
+package or pipeline repository these tests live in
+`tests/testthat/test-join-contracts.R` and run with everything else
+under
+[`testthat::test_dir()`](https://testthat.r-lib.org/reference/test_dir.html)
+or `R CMD check`. What data they point at is the design decision:
+against committed fixture files they test the code’s assumptions;
+against a small fresh extract they test the data itself, which makes
+them a scheduled data-quality job wearing a unit-test interface.
 
 ## Logging and Audit Trails
 
@@ -267,7 +570,8 @@ would allow. The two functions complement each other.
 
 [`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
 writes a single report to a file. The format depends on the file
-extension:
+extension: `.txt` and `.log` produce human-readable text, `.json`
+produces machine-readable JSON, and `.rds` saves the complete R object.
 
 ``` r
 
@@ -276,22 +580,22 @@ report <- join_spy(sensors, readings, by = "sensor_id")
 # Text format -- human-readable
 txt_log <- tempfile(fileext = ".log")
 log_report(report, txt_log)
-#> ✔ Report logged to C:/Temp\Rtmp2BnYNR\file31bf43ca12605.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c81eac436.log
 cat(readLines(txt_log), sep = "\n")
-#> Logged: 2026-03-31 23:21:09
+#> Logged: 2026-06-13 00:54:08
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
 #> Left Table (x):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Right Table (y):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Match Analysis:
@@ -312,25 +616,36 @@ cat(readLines(txt_log), sep = "\n")
 unlink(txt_log)
 ```
 
+The text entry mirrors the printed report – key column, per-table
+summaries, match analysis, expected rows per join type, and an issue
+tally – with a separator line so consecutive entries stay readable in
+one file. By default
+[`log_report()`](https://gillescolling.com/joinspy/reference/log_report.md)
+overwrites; `append = TRUE` adds to the end (text and log formats only),
+and the timestamp written with each entry means a grep for a date range
+works on the raw file.
+
 ``` r
 
 # JSON format -- machine-readable
 json_log <- tempfile(fileext = ".json")
 log_report(report, json_log)
-#> ✔ Report logged to C:/Temp\Rtmp2BnYNR\file31bf41787369d.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c879c668d5.json
 cat(readLines(json_log), sep = "\n")
 #> {
 #>   "by": "sensor_id",
 #>   "x_summary": {
 #>   "n_rows": 4,
 #>   "n_unique": 4,
-#>   "n_duplicated": null,
+#>   "n_duplicates": 0,
+#>   "n_duplicate_rows": 0,
 #>   "n_na": 0
 #> },
 #>   "y_summary": {
 #>   "n_rows": 4,
 #>   "n_unique": 4,
-#>   "n_duplicated": null,
+#>   "n_duplicates": 0,
+#>   "n_duplicate_rows": 0,
 #>   "n_na": 0
 #> },
 #>   "match_analysis": {
@@ -347,7 +662,7 @@ cat(readLines(json_log), sep = "\n")
 #> },
 #>   "n_issues": 1,
 #>   "issue_types": "near_match",
-#>   "logged_at": "2026-03-31 23:21:09"
+#>   "logged_at": "2026-06-13 00:54:08"
 #> }
 unlink(json_log)
 ```
@@ -355,7 +670,11 @@ unlink(json_log)
 Text format works for tailing logs during a batch run; JSON format feeds
 into monitoring systems or downstream scripts. Reports can also be saved
 as `.rds` files, which preserves the full R object for later interactive
-inspection.
+inspection. The `.rds` route matters when the issues themselves need
+preserving: text and JSON record issue counts and types, while the RDS
+file keeps each issue’s `details` element – the actual offending key
+values – which is what we want in front of us when reconstructing what
+went wrong last Tuesday.
 
 ### Automatic logging
 
@@ -370,7 +689,7 @@ to the file.
 
 auto_log <- tempfile(fileext = ".log")
 set_log_file(auto_log, format = "text")
-#> ℹ Automatic logging enabled: C:/Temp\Rtmp2BnYNR\file31bf429b81d46.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c83a2c1fc1.log
 
 # These joins are automatically logged
 result1 <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
@@ -379,20 +698,20 @@ result2 <- inner_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 # Check what got logged
 cat(readLines(auto_log), sep = "\n")
 #> 
-#> Logged: 2026-03-31 23:21:09
+#> Logged: 2026-06-13 00:54:08
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
 #> Left Table (x):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Right Table (y):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Match Analysis:
@@ -411,20 +730,20 @@ cat(readLines(auto_log), sep = "\n")
 #>   near_match: 1
 #> ============================================================
 #> 
-#> Logged: 2026-03-31 23:21:09
+#> Logged: 2026-06-13 00:54:08
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
 #> Left Table (x):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Right Table (y):
 #>   Rows: 4
 #>   Unique keys: 4
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Match Analysis:
@@ -449,6 +768,26 @@ set_log_file(NULL)
 unlink(auto_log)
 ```
 
+Each wrapper call appends one entry, so the file accumulates a
+join-by-join history of the run even when every join is `.quiet`.
+[`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
+returns the previous setting invisibly, which lets a function enable
+logging for its own joins and then put back whatever the caller had
+configured:
+
+``` r
+
+fn_log <- tempfile(fileext = ".log")
+previous <- set_log_file(fn_log)
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c815f5639e.log
+
+result <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
+
+set_log_file(previous)
+#> ℹ Automatic logging disabled
+unlink(fn_log)
+```
+
 Automatic logging only triggers from `*_join_spy()` wrappers.
 [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md)
 and bare [`merge()`](https://rdrr.io/r/base/merge.html) calls are not
@@ -459,7 +798,9 @@ as a separate check and use a `*_join_spy()` wrapper for the actual
 join.
 
 [`get_log_file()`](https://gillescolling.com/joinspy/reference/get_log_file.md)
-returns the current log path (or `NULL` if logging is disabled):
+returns the current log path (or `NULL` if logging is disabled), which
+is useful inside helpers that should log only when the surrounding
+pipeline asked for it:
 
 ``` r
 
@@ -468,6 +809,173 @@ if (!is.null(get_log_file())) {
   message("Logging is active at: ", get_log_file())
 }
 ```
+
+## Reading JSON Logs Downstream
+
+The JSON format exists for consumers that are not R: a dashboard, a cron
+wrapper in Python, a shell script that greps last night’s log. joinspy
+serializes reports with an internal base-R writer, so the package
+carries no JSON dependency, and the output is plain JSON that any parser
+reads. Each entry records the join key, both table summaries, the match
+analysis, the expected row counts, the issue count and types, and a
+timestamp.
+
+Each report is appended as its own object, so the file is a sequence of
+JSON objects; line-oriented tools work on it directly, and a full parser
+reads it one object at a time. Reading it back in R needs nothing beyond
+base functions, so we log two joins and then play the part of the
+monitoring script:
+
+``` r
+
+json_log <- tempfile(fileext = ".json")
+set_log_file(json_log, format = "json")
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c8183302d.json
+
+r1 <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
+r2 <- inner_join_spy(orders, customers, by = "customer_id", .quiet = TRUE)
+
+set_log_file(NULL)
+#> ℹ Automatic logging disabled
+```
+
+The monitoring side reads the file, finds the lines carrying the field
+it cares about, and extracts the values:
+
+``` r
+
+log_lines <- readLines(json_log)
+rate_lines <- grep('"match_rate"', log_lines, value = TRUE)
+rate_lines
+#> [1] "  \"match_rate\": 0.75" "  \"match_rate\": 1"
+```
+
+``` r
+
+rates <- as.numeric(sub('.*"match_rate": *([0-9.]+).*', "\\1", rate_lines))
+rates
+#> [1] 0.75 1.00
+which(rates < 0.95)
+#> [1] 1
+unlink(json_log)
+```
+
+The sensor join logged its 75% match rate, the order join a clean 100%,
+and the threshold flags entry one. The same extract pattern works on
+`"n_issues"` for issue-count alerting. It also works on `"logged_at"`
+for staleness checks – a pipeline whose newest log entry is two days old
+has a different problem than a pipeline logging failures, and the
+timestamp catches it. For richer processing, any JSON library parses the
+entries one object at a time; the field names match the report
+components walked through earlier, so a script written against the JSON
+and a script written against
+[`last_report()`](https://gillescolling.com/joinspy/reference/last_report.md)
+read the same vocabulary.
+
+## Diagnosing a Multi-Join Pipeline
+
+Real pipelines chain joins: orders pick up customer attributes,
+customers pick up regions, regions pick up targets. When the final table
+has the wrong row count, the offending join could be any of them, and
+checking each one by hand means re-running the pipeline step by step.
+[`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)
+does that walk in one call – it takes a named list of tables and a list
+of join specifications, runs
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+at every step, carries the intermediate result forward with a left join,
+and prints a per-step summary.
+
+``` r
+
+orders_chain <- data.frame(
+  order_id = 1:6,
+  customer_id = c("C1", "C2", "C2", "C3", "C4", "C4"),
+  stringsAsFactors = FALSE
+)
+
+customers_chain <- data.frame(
+  customer_id = c("C1", "C2", "C3", "C4"),
+  region_id = c("R1", "R1", "R2", "R3"),
+  stringsAsFactors = FALSE
+)
+
+regions <- data.frame(
+  region_id = c("R1", "R2"),
+  region_name = c("North", "South"),
+  stringsAsFactors = FALSE
+)
+```
+
+``` r
+
+chain <- analyze_join_chain(
+  tables = list(orders = orders_chain, customers = customers_chain,
+                regions = regions),
+  joins = list(
+    list(left = "orders", right = "customers", by = "customer_id"),
+    list(left = "result", right = "regions", by = "region_id")
+  )
+)
+#> 
+#> ── Join Chain Analysis ─────────────────────────────────────────────────────────
+#> 
+#> ── Step 1: orders + customers ──
+#> 
+#> Left: 6 rows
+#> Right: 4 rows
+#> Match rate: 100%
+#> Expected result: 6 rows (left join)
+#> ! 1 issue(s) detected
+#> 
+#> ── Step 2: result + regions ──
+#> 
+#> Left: 6 rows
+#> Right: 2 rows
+#> Match rate: 66.7%
+#> Expected result: 6 rows (left join)
+#> ! 1 issue(s) detected
+#> 
+#> ── Chain Summary ──
+#> 
+#> ! Total issues across chain: 2
+```
+
+The literal name `"result"` refers to the accumulated output of the
+previous steps, so chains of any length need only that one keyword. Step
+1 reports the order-side duplicates, which are expected for transaction
+data joining a lookup. The real finding is at step 2, where the match
+rate drops: region `"R3"` exists in the customer table and has no row in
+`regions`. That is the kind of fact that hides for months in a
+three-join pipeline, because each individual join “works”.
+
+The return value is a list with one entry per step, each holding the
+table names, the `by` columns, and the full `JoinReport`, so everything
+from the programmatic-inspection section applies per step:
+
+``` r
+
+chain[[2]]$report$match_analysis$match_rate
+#> [1] 0.6666667
+chain[[2]]$report$match_analysis$left_only_keys
+#> [1] "R3"
+```
+
+A chain-level gate reduces to one vector:
+
+``` r
+
+vapply(chain, function(s) length(s$report$issues), integer(1))
+#> [1] 1 1
+```
+
+In production we run the chain analysis at deployment time and whenever
+an upstream schema changes. Since it performs each intermediate left
+join to feed the next step, its cost is comparable to running the
+pipeline’s joins once, which makes it a pre-flight and post-incident
+tool; the per-run gates stay with
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+and
+[`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.md).
 
 ## Sampling for Large Datasets
 
@@ -495,13 +1003,33 @@ big_customers <- data.frame(
 # Full analysis
 system.time(report_full <- join_spy(big_orders, big_customers, by = "customer_id"))
 #>    user  system elapsed 
-#>    0.11    0.06    0.18
+#>    0.19    0.03    0.26
 
 # Sampled analysis
 system.time(report_sampled <- join_spy(big_orders, big_customers,
                                         by = "customer_id", sample = 5000))
 #>    user  system elapsed 
-#>    0.09    0.00    0.09
+#>    0.12    0.00    0.11
+```
+
+The sampled report records its own provenance in `report$sampling` – the
+sample size and the original row counts – and the printed report flags
+it, so a log reader can tell estimated diagnostics from exact ones:
+
+``` r
+
+report_sampled$sampling
+#> $sampled
+#> [1] TRUE
+#> 
+#> $original_x_rows
+#> [1] 50000
+#> 
+#> $original_y_rows
+#> [1] 6000
+#> 
+#> $sample_size
+#> [1] 5000
 ```
 
 The sampled report is approximate – match rates and duplicate counts are
@@ -509,7 +1037,9 @@ estimated from the subset. For production monitoring, we typically care
 whether the match rate is roughly 95% or roughly 60%, not whether it is
 94.7% or 95.1%. Sampling catches systemic problems (wrong key column,
 widespread encoding issues, duplicate explosion) with a fraction of the
-runtime.
+runtime. A [`set.seed()`](https://rdrr.io/r/base/Random.html) ahead of
+the call makes the sampled diagnostic reproducible, which keeps two runs
+on identical data from flapping between alert and no alert.
 
 Sampling can miss rare issues. If 0.1% of keys have a zero-width space,
 a 5,000-row sample from a 10-million-row table might not include any.
@@ -532,7 +1062,7 @@ enforcement, and logs everything.
 # --- Setup logging ---
 pipeline_log <- tempfile(fileext = ".log")
 set_log_file(pipeline_log, format = "text")
-#> ℹ Automatic logging enabled: C:/Temp\Rtmp2BnYNR\file31bf4120083b.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp44YbEN\file82c88b665f5.log
 
 # --- Load data (simulated) ---
 orders <- data.frame(
@@ -568,12 +1098,12 @@ if (!keys_ok) {
 
 # --- Gate 2: cardinality check ---
 card <- detect_cardinality(orders, customers, by = "customer_id")
-#> ℹ Detected cardinality: "m:1"
+#> ℹ Detected cardinality: "n:1"
 #> Left duplicates: 1 key(s)
-if (card == "m:m") {
+if (card == "n:m") {
   set_log_file(NULL)
   unlink(pipeline_log)
-  stop("Unexpected m:m cardinality in orders-customers join", call. = FALSE)
+  stop("Unexpected n:m cardinality in orders-customers join", call. = FALSE)
 }
 
 # --- Join (with auto-logging via *_join_spy) ---
@@ -605,20 +1135,20 @@ if (file.exists(pipeline_log)) {
   cat(readLines(pipeline_log), sep = "\n")
 }
 #> 
-#> Logged: 2026-03-31 23:21:10
+#> Logged: 2026-06-13 00:54:09
 #> ------------------------------------------------------------
 #> Join Key: customer_id
 #> 
 #> Left Table (x):
 #>   Rows: 6
 #>   Unique keys: 5
-#>   Duplicated keys: 
+#>   Duplicated keys: 1
 #>   NA keys: 0
 #> 
 #> Right Table (y):
 #>   Rows: 6
 #>   Unique keys: 6
-#>   Duplicated keys: 
+#>   Duplicated keys: 0
 #>   NA keys: 0
 #> 
 #> Match Analysis:
@@ -643,13 +1173,84 @@ set_log_file(NULL)
 unlink(pipeline_log)
 ```
 
-The three gates catch different failure modes:
-[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
-catches string-level problems and attempts repair,
-[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)
-halts on unexpected many-to-many relationships, and the row count check
-guards against anything the first two gates missed. Logging runs
-throughout because
+The three gates catch different failure modes. Gate 1 catches
+string-level problems and repairs the mechanical ones; in this run it
+finds the padded `"C002 "` and trims it, so that customer keeps its name
+and tier in the enriched output. Gate 2 halts on the one structural
+problem repair cannot touch: an unexpected many-to-many relationship,
+the kind that multiplies rows. Gate 3 is the catch-all – a left join
+returning fewer rows than its left table means something went wrong at a
+level the key diagnostics do not see, such as an upstream filter applied
+to the wrong object. Logging runs throughout because
 [`set_log_file()`](https://gillescolling.com/joinspy/reference/set_log_file.md)
-was called at the top. The structure scales – more tables, more gates,
-more joins, same pattern.
+was called at the top, so even a run that dies at gate 3 leaves a record
+of the join that preceded the death.
+
+Equally deliberate is what the pattern does not check. It never verifies
+that `customer_id` is the right column to join on; a clean key on the
+wrong column passes every gate. It enforces no match-rate floor, so
+orders for customers missing from the reference table sail through with
+`NA` names – adding a fourth gate on
+`last_report()$match_analysis$match_rate` covers that case when
+unmatched keys count as failures for the job at hand. And it validates
+keys only: a corrupted `amount` column is invisible to every check here,
+which is why these gates complement value-level validation tools rather
+than replace them.
+
+The pattern stops scaling somewhere around a dozen joins. At that point
+the gate blocks become copy-paste boilerplate, the thresholds belong in
+a config file, and the per-join logic wants to be a function taking two
+tables, a key, and an expected cardinality. Past that, a pipeline
+framework such as `targets` is the better skeleton, with these same
+checks living inside each node. The log file also grows without bound
+under a daily schedule; naming it by date
+(`sprintf("enrich-%s.log", Sys.Date())`) keeps each day’s audit trail
+separate and bounded.
+
+## The Cost of Diagnostics
+
+Every gate adds runtime, and on a 50,000-row join it is worth seeing how
+much. We time the bare join, the instrumented wrapper, and the cheap
+gate on the tables from the sampling section:
+
+``` r
+
+t_merge <- system.time(
+  merge(big_orders, big_customers, by = "customer_id", all.x = TRUE)
+)
+t_spy <- system.time(
+  left_join_spy(big_orders, big_customers, by = "customer_id", .quiet = TRUE)
+)
+t_check <- system.time(
+  key_check(big_orders, big_customers, by = "customer_id", warn = FALSE)
+)
+
+rbind(merge = t_merge, left_join_spy = t_spy, key_check = t_check)[, 1:3]
+#>               user.self sys.self elapsed
+#> merge              0.14     0.03    0.18
+#> left_join_spy      0.72     0.09    0.84
+#> key_check          0.05     0.00    0.05
+```
+
+The gap between [`merge()`](https://rdrr.io/r/base/merge.html) and
+[`left_join_spy()`](https://gillescolling.com/joinspy/reference/left_join_spy.md)
+is the full diagnostic: key summaries, match analysis, row-count
+prediction, and the string scans. The scans are vectorized, and the one
+quadratic piece – near-match detection – is capped at 50 unmatched keys
+against 100 candidates regardless of table size, so the diagnostic cost
+grows roughly linearly with the number of unique keys.
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+runs the cheap subset only, which is why it can sit in front of every
+join in a script.
+
+When the elapsed column stops looking ignorable – tables in the tens of
+millions of rows, or a join inside a tight loop – the fallback order is:
+keep
+[`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+on every run, move the full
+[`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
+diagnostic to a `sample =` run, and reserve the unsampled analysis for a
+weekly job or for the morning after an alert. The numbers above are the
+budget conversation in miniature: the gate costs a fraction of the join
+it protects, and the sampling section shows how to hold that fraction
+steady as the tables grow.

@@ -60,6 +60,11 @@ A `JoinReport` object with the following components:
 
   Predicted row counts for each join type
 
+- memory_estimate:
+
+  Heuristic estimate of the result size for each join type, as
+  human-readable strings
+
 ## Details
 
 This function detects the following common join issues:

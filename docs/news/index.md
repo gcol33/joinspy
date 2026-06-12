@@ -1,5 +1,40 @@
 # Changelog
 
+## joinspy 0.8.2
+
+### Bug fixes
+
+- Logged reports now record duplicate-key counts. Text and JSON logs
+  previously left the count blank because the serializer read a mistyped
+  field name ([\#1](https://github.com/gcol33/joinspy/issues/1)).
+- Composite (multi-column) keys with a missing component are now treated
+  as `NA`, matching how joins handle them. This corrects NA counts,
+  duplicate detection, and row-count predictions for composite keys
+  ([\#3](https://github.com/gcol33/joinspy/issues/3)).
+- Predicted row counts no longer overflow to `NA` for very large joins;
+  counts are kept as doubles
+  ([\#4](https://github.com/gcol33/joinspy/issues/4)).
+- `%||%` is imported from rlang, so the package works on R 4.1 through
+  4.3 ([\#2](https://github.com/gcol33/joinspy/issues/2)).
+- Report printing and
+  [`key_check()`](https://gillescolling.com/joinspy/reference/key_check.md)
+  treat issue text as data, so braces in column names or values are no
+  longer interpreted by cli
+  ([\#5](https://github.com/gcol33/joinspy/issues/5)).
+- [`suggest_repairs()`](https://gillescolling.com/joinspy/reference/suggest_repairs.md)
+  generates valid code for non-syntactic column names using `[[ ]]`
+  indexing ([\#6](https://github.com/gcol33/joinspy/issues/6)).
+
+### Internal
+
+- Key resolution, composite-key construction, column checks, and
+  cardinality classification now share single-source helpers
+  ([\#7](https://github.com/gcol33/joinspy/issues/7)).
+- Errors use cli for consistent, classed messages.
+- JSON logging escapes backslashes and control characters.
+
+------------------------------------------------------------------------
+
 ## joinspy 0.8.0
 
 CRAN release: 2026-03-31
@@ -97,7 +132,7 @@ CRAN release: 2026-03-31
 - **[`check_cartesian()`](https://gillescolling.com/joinspy/reference/check_cartesian.md)**:
   Detect and warn about cross-join / Cartesian product explosions
 - **[`detect_cardinality()`](https://gillescolling.com/joinspy/reference/detect_cardinality.md)**:
-  Determine actual key relationship (1:1, 1:m, m:1, m:m)
+  Determine actual key relationship (1:1, 1:n, n:1, n:m)
 - **[`analyze_join_chain()`](https://gillescolling.com/joinspy/reference/analyze_join_chain.md)**:
   Analyze cascading joins in multi-table workflows
 
@@ -200,7 +235,7 @@ Initial release.
 - Case mismatch detection
 - Encoding issue detection (UTF-8 vs Latin-1, invisible Unicode)
 - NA key detection
-- Cardinality analysis (1:1, 1:many, many:1, many:many)
+- Cardinality analysis (1:1, 1:n, n:1, n:m)
 
 ### S3 Methods
 

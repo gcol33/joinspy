@@ -21,6 +21,8 @@
 <url><loc>https://gillescolling.com/joinspy/reference/detect_cardinality.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-analyze_match.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-analyze_multicolumn_keys.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-check_cols.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-classify_cardinality.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_backend.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_case_mismatch.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_empty_strings.html</loc></url>
@@ -32,13 +34,17 @@
 <url><loc>https://gillescolling.com/joinspy/reference/dot-detect_whitespace.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-format_bytes.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-join_spy_impl.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-json_escape.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-levenshtein.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-make_key.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-perform_join.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-predict_row_counts.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-report_to_list.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-report_to_text.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-resolve_by.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-summarize_keys.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/dot-to_json.html</loc></url>
+<url><loc>https://gillescolling.com/joinspy/reference/dot-validate_df.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/full_join_spy.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/get_log_file.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/index.html</loc></url>

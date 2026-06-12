@@ -57,6 +57,20 @@ join_explain <- function(result, x, y, by, type = NULL) {
   y_keys <- .make_key(y, y_by)
   match_info <- .analyze_match(x_keys, y_keys, n_x)
 
+  # Infer join type from row counts when not supplied; ambiguous or
+  # unmatched predictions leave type NULL and all explanations are shown
+  inferred <- FALSE
+  if (is.null(type)) {
+    predicted <- .predict_row_counts(x, y, by)
+    candidates <- names(predicted)[vapply(predicted, function(n) {
+      n == n_result
+    }, logical(1))]
+    if (length(candidates) == 1L) {
+      type <- candidates
+      inferred <- TRUE
+    }
+  }
+
   # Build explanation
   cli_h1("Join Explanation")
 
@@ -73,6 +87,9 @@ join_explain <- function(result, x, y, by, type = NULL) {
 ")
   } else {
     cli_alert_success("Result has same row count as left table")
+  }
+  if (inferred) {
+    cli_text("Join type: {.val {type}} (inferred from row counts)")
   }
   cat("\n")
 
@@ -112,7 +129,7 @@ join_explain <- function(result, x, y, by, type = NULL) {
     ))
   }
 
-  if (type == "inner" && match_info$n_left_only > 0) {
+  if (!is.null(type) && type == "inner" && match_info$n_left_only > 0) {
     explanations <- c(explanations, sprintf(
       "Inner join dropped %d unmatched left rows",
       match_info$n_left_only

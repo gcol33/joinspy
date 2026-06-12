@@ -98,10 +98,12 @@
 
   # data.table merge uses on= with setnames approach for different column names
   if (!identical(x_by, y_by)) {
-    # Rename y columns to match x for the join, then restore
-    old_names <- y_by
-    new_names <- x_by
-    data.table::setnames(y_dt, old_names, new_names)
+    # as.data.table() returns data.table input as-is, so copy before
+    # renaming to keep the caller's y untouched
+    if (data.table::is.data.table(y)) {
+      y_dt <- data.table::copy(y_dt)
+    }
+    data.table::setnames(y_dt, y_by, x_by)
     on_cols <- x_by
   } else {
     on_cols <- x_by
