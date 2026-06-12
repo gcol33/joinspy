@@ -12,10 +12,10 @@
 #' @keywords internal
 addin_join_inspector <- function() {
   if (!requireNamespace("shiny", quietly = TRUE)) {
-    stop("The 'shiny' package is required for this addin. Install with: install.packages('shiny')", call. = FALSE)
+    cli_abort("The {.pkg shiny} package is required for this addin. Install it with {.code install.packages(\"shiny\")}.")
   }
   if (!requireNamespace("miniUI", quietly = TRUE)) {
-    stop("The 'miniUI' package is required for this addin. Install with: install.packages('miniUI')", call. = FALSE)
+    cli_abort("The {.pkg miniUI} package is required for this addin. Install it with {.code install.packages(\"miniUI\")}.")
   }
 
   # Get data frames from global environment
@@ -26,7 +26,7 @@ addin_join_inspector <- function() {
   }, logical(1))]
 
   if (length(df_names) < 2) {
-    stop("Need at least 2 data frames in the global environment", call. = FALSE)
+    cli_abort("Need at least 2 data frames in the global environment.")
   }
 
   ui <- miniUI::miniPage(

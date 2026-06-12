@@ -25,21 +25,19 @@
 #' @seealso [join_spy()], [join_strict()]
 #' @export
 check_cartesian <- function(x, y, by, threshold = 10) {
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
+  .check_cols(x, x_by, "x")
+  .check_cols(y, y_by, "y")
 
   # Get key vectors
-  if (length(x_by) == 1) {
-    x_keys <- x[[x_by]]
-    y_keys <- y[[y_by]]
-  } else {
-    x_keys <- do.call(paste, c(x[x_by], sep = "\x1F"))
-    y_keys <- do.call(paste, c(y[y_by], sep = "\x1F"))
-  }
+  x_keys <- .make_key(x, x_by)
+  y_keys <- .make_key(y, y_by)
 
   # Count occurrences per key
   x_counts <- table(x_keys[!is.na(x_keys)])
@@ -68,12 +66,12 @@ check_cartesian <- function(x, y, by, threshold = 10) {
   expansion_factor <- total_inner / max_input
 
   # Find worst offenders
-  worst_idx <- order(expansions, decreasing = TRUE)[1:min(5, length(expansions))]
+  worst_idx <- order(expansions, decreasing = TRUE)[seq_len(min(5, length(expansions)))]
   worst_keys <- data.frame(
     key = matched_keys[worst_idx],
     x_count = as.integer(x_counts[matched_keys[worst_idx]]),
     y_count = as.integer(y_counts[matched_keys[worst_idx]]),
-    product = as.integer(expansions[worst_idx]),
+    product = expansions[worst_idx],
     stringsAsFactors = FALSE
   )
 
@@ -129,7 +127,7 @@ check_cartesian <- function(x, y, by, threshold = 10) {
 #' @export
 analyze_join_chain <- function(tables, joins) {
   if (!is.list(tables) || is.null(names(tables))) {
-    stop("`tables` must be a named list of data frames", call. = FALSE)
+    cli_abort("{.arg tables} must be a named list of data frames.")
   }
 
   cli_h1("Join Chain Analysis")
@@ -226,12 +224,13 @@ analyze_join_chain <- function(tables, joins) {
 #' @seealso [join_strict()], [join_spy()]
 #' @export
 detect_cardinality <- function(x, y, by) {
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   x_summary <- .summarize_keys(x, x_by)
   y_summary <- .summarize_keys(y, y_by)
@@ -239,15 +238,7 @@ detect_cardinality <- function(x, y, by) {
   x_has_dups <- x_summary$n_duplicates > 0
   y_has_dups <- y_summary$n_duplicates > 0
 
-  cardinality <- if (x_has_dups && y_has_dups) {
-    "n:m"
-  } else if (x_has_dups) {
-    "n:1"
-  } else if (y_has_dups) {
-    "1:n"
-  } else {
-    "1:1"
-  }
+  cardinality <- .classify_cardinality(x_has_dups, y_has_dups)
 
   cli_alert_info("Detected cardinality: {.val {cardinality}}")
 

@@ -145,13 +145,7 @@
 .summarize_keys <- function(data, by) {
   n_rows <- nrow(data)
 
-
-  # Create composite key if multiple columns
-  if (length(by) == 1) {
-    keys <- data[[by]]
-  } else {
-    keys <- do.call(paste, c(data[by], sep = "\x1F"))
-  }
+  keys <- .make_key(data, by)
 
   n_na <- sum(is.na(keys))
   keys_no_na <- keys[!is.na(keys)]
@@ -218,17 +212,9 @@
 #' @return A list with predicted row counts.
 #' @keywords internal
 .predict_row_counts <- function(x, y, by) {
-  # Get keys
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
-
-  if (length(x_by) == 1) {
-    x_keys <- x[[x_by]]
-    y_keys <- y[[y_by]]
-  } else {
-    x_keys <- do.call(paste, c(x[x_by], sep = "\x1F"))
-    y_keys <- do.call(paste, c(y[y_by], sep = "\x1F"))
-  }
+  resolved <- .resolve_by(by)
+  x_keys <- .make_key(x, resolved$x)
+  y_keys <- .make_key(y, resolved$y)
 
   # Count occurrences
   x_counts <- table(x_keys[!is.na(x_keys)])
@@ -256,10 +242,10 @@
   full <- inner + x_unmatched + y_unmatched
 
   list(
-    inner = as.integer(inner),
-    left = as.integer(left),
-    right = as.integer(right),
-    full = as.integer(full)
+    inner = inner,
+    left = left,
+    right = right,
+    full = full
   )
 }
 

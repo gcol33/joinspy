@@ -2,6 +2,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
+#' @importFrom cli cli_abort
 #' @importFrom cli cli_alert_danger
 #' @importFrom cli cli_alert_info
 #' @importFrom cli cli_alert_success
@@ -11,6 +12,7 @@
 #' @importFrom cli cli_h2
 #' @importFrom cli cli_text
 #' @importFrom rlang .data
+#' @importFrom rlang %||%
 #' @importFrom utils adist head object.size
 ## usethis namespace: end
 NULL

@@ -34,7 +34,7 @@
 #' @export
 log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
   if (!is_join_report(report)) {
-    stop("`report` must be a JoinReport object", call. = FALSE)
+    cli_abort("{.arg report} must be a {.cls JoinReport} object.")
   }
 
   ext <- tolower(tools::file_ext(file))
@@ -75,13 +75,15 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
     x_summary = list(
       n_rows = report$x_summary$n_rows,
       n_unique = report$x_summary$n_unique,
-      n_duplicated = report$x_summary$n_duplicated,
+      n_duplicates = report$x_summary$n_duplicates,
+      n_duplicate_rows = report$x_summary$n_duplicate_rows,
       n_na = report$x_summary$n_na
     ),
     y_summary = list(
       n_rows = report$y_summary$n_rows,
       n_unique = report$y_summary$n_unique,
-      n_duplicated = report$y_summary$n_duplicated,
+      n_duplicates = report$y_summary$n_duplicates,
+      n_duplicate_rows = report$y_summary$n_duplicate_rows,
       n_na = report$y_summary$n_na
     ),
     match_analysis = list(
@@ -100,6 +102,19 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
   }
 
   result
+}
+
+#' Escape a string for inclusion in JSON
+#' @param s Character vector.
+#' @return Character vector with backslash, quote, and control characters escaped.
+#' @keywords internal
+.json_escape <- function(s) {
+  s <- gsub("\\", "\\\\", s, fixed = TRUE)
+  s <- gsub("\"", "\\\"", s, fixed = TRUE)
+  s <- gsub("\n", "\\n", s, fixed = TRUE)
+  s <- gsub("\r", "\\r", s, fixed = TRUE)
+  s <- gsub("\t", "\\t", s, fixed = TRUE)
+  s
 }
 
 #' Simple JSON serialization (no dependencies)
@@ -122,9 +137,9 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
       if (length(val) == 0) {
         "[]"
       } else if (length(val) == 1) {
-        paste0("\"", gsub("\"", "\\\\\"", val), "\"")
+        paste0("\"", .json_escape(val), "\"")
       } else {
-        paste0("[", paste0("\"", gsub("\"", "\\\\\"", val), "\"", collapse = ", "), "]")
+        paste0("[", paste0("\"", .json_escape(val), "\"", collapse = ", "), "]")
       }
     } else if (is.list(val)) {
       .to_json(val)
@@ -167,7 +182,7 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
 
   lines <- c(lines, paste0("  Rows: ", report$x_summary$n_rows))
   lines <- c(lines, paste0("  Unique keys: ", report$x_summary$n_unique))
-  lines <- c(lines, paste0("  Duplicated keys: ", report$x_summary$n_duplicated))
+  lines <- c(lines, paste0("  Duplicated keys: ", report$x_summary$n_duplicates))
   lines <- c(lines, paste0("  NA keys: ", report$x_summary$n_na))
   lines <- c(lines, "")
 
@@ -175,7 +190,7 @@ log_report <- function(report, file, append = FALSE, timestamp = TRUE) {
   lines <- c(lines, "Right Table (y):")
   lines <- c(lines, paste0("  Rows: ", report$y_summary$n_rows))
   lines <- c(lines, paste0("  Unique keys: ", report$y_summary$n_unique))
-  lines <- c(lines, paste0("  Duplicated keys: ", report$y_summary$n_duplicated))
+  lines <- c(lines, paste0("  Duplicated keys: ", report$y_summary$n_duplicates))
   lines <- c(lines, paste0("  NA keys: ", report$y_summary$n_na))
   lines <- c(lines, "")
 

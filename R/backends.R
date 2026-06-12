@@ -52,8 +52,7 @@
     "dplyr"      = .join_dplyr(x, y, by, type, ...),
     "data.table" = .join_data_table(x, y, by, type, ...),
     "base"       = .join_base(x, y, by, type, ...),
-    stop(sprintf("Unknown backend: '%s'. Use 'base', 'dplyr', or 'data.table'.", backend),
-         call. = FALSE)
+    cli_abort("Unknown backend: {.val {backend}}. Use {.val base}, {.val dplyr}, or {.val data.table}.")
   )
 }
 
@@ -64,13 +63,10 @@
   all_x <- type %in% c("left", "full")
   all_y <- type %in% c("right", "full")
 
-  if (is.null(names(by))) {
-    merge(x, y, by = by, all.x = all_x, all.y = all_y, ...)
-  } else {
-    merge(x, y,
-          by.x = names(by), by.y = unname(by),
-          all.x = all_x, all.y = all_y, ...)
-  }
+  resolved <- .resolve_by(by)
+  merge(x, y,
+        by.x = resolved$x, by.y = resolved$y,
+        all.x = all_x, all.y = all_y, ...)
 }
 
 
@@ -96,8 +92,9 @@
   y_dt <- data.table::as.data.table(y)
 
   # Resolve column names
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   # data.table merge uses on= with setnames approach for different column names
   if (!identical(x_by, y_by)) {

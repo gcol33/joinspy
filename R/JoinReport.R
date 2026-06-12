@@ -85,11 +85,11 @@ print.JoinReport <- function(x, ...) {
       severity <- issue$severity %||% "warning"
       msg <- issue$message
       if (severity == "error") {
-        cli_alert_danger(msg)
+        cli_alert_danger("{msg}")
       } else if (severity == "warning") {
-        cli_alert_warning(msg)
+        cli_alert_warning("{msg}")
       } else {
-        cli_alert_info(msg)
+        cli_alert_info("{msg}")
       }
     }
     cat("\n")
@@ -247,7 +247,7 @@ plot.JoinReport <- function(x, file = NULL, width = 6, height = 5,
     } else if (ext == "pdf") {
       grDevices::pdf(file, width = width, height = height)
     } else {
-      stop("Unsupported file format. Use .png, .svg, or .pdf", call. = FALSE)
+      cli_abort("Unsupported file format. Use {.val .png}, {.val .svg}, or {.val .pdf}.")
     }
     on.exit(grDevices::dev.off(), add = TRUE)
   }

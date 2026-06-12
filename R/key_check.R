@@ -31,22 +31,17 @@
 #' @export
 key_check <- function(x, y, by, warn = TRUE) {
   # Validate inputs
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Handle named by vector (e.g., c("id" = "customer_id"))
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   # Check columns exist
-  missing_x <- setdiff(x_by, names(x))
-  missing_y <- setdiff(y_by, names(y))
-  if (length(missing_x) > 0) {
-    stop("Column(s) not found in x: ", paste(missing_x, collapse = ", "), call. = FALSE)
-  }
-  if (length(missing_y) > 0) {
-    stop("Column(s) not found in y: ", paste(missing_y, collapse = ", "), call. = FALSE)
-  }
+  .check_cols(x, x_by, "x")
+  .check_cols(y, y_by, "y")
 
   issues <- character(0)
 
@@ -118,7 +113,7 @@ key_check <- function(x, y, by, warn = TRUE) {
     } else {
       cli_alert_warning("Key check found {length(issues)} issue(s):")
       for (issue in issues) {
-        cli_alert_danger(issue)
+        cli_alert_danger("{issue}")
       }
     }
   }
@@ -163,20 +158,13 @@ key_check <- function(x, y, by, warn = TRUE) {
 key_duplicates <- function(data, by, keep = c("all", "first", "last")) {
   keep <- match.arg(keep)
 
-  if (!is.data.frame(data)) stop("`data` must be a data frame", call. = FALSE)
+  .validate_df(data, "data")
 
   # Check columns exist
-  missing <- setdiff(by, names(data))
-  if (length(missing) > 0) {
-    stop("Column(s) not found: ", paste(missing, collapse = ", "), call. = FALSE)
-  }
+  .check_cols(data, by)
 
-  # Create composite key if multiple columns
-  if (length(by) == 1) {
-    keys <- data[[by]]
-  } else {
-    keys <- do.call(paste, c(data[by], sep = "\x1F"))
-  }
+  # Build the key (composite keys are NA when any component is NA)
+  keys <- .make_key(data, by)
 
   # Find duplicated keys (count occurrences)
   key_counts <- table(keys)

@@ -45,35 +45,28 @@ join_repair <- function(x, y = NULL, by,
                         empty_to_na = FALSE,
                         dry_run = FALSE) {
 
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.null(y) && !is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  if (!is.null(y)) .validate_df(y, "y")
 
   # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   # Check columns exist
-  missing_x <- setdiff(x_by, names(x))
-  if (length(missing_x) > 0) {
-    stop("Column(s) not found in x: ", paste(missing_x, collapse = ", "), call. = FALSE)
-  }
-  if (!is.null(y)) {
-    missing_y <- setdiff(y_by, names(y))
-    if (length(missing_y) > 0) {
-      stop("Column(s) not found in y: ", paste(missing_y, collapse = ", "), call. = FALSE)
-    }
-  }
+  .check_cols(x, x_by, "x")
+  if (!is.null(y)) .check_cols(y, y_by, "y")
 
   # Validate standardize_case
   if (!is.null(standardize_case) && !standardize_case %in% c("lower", "upper")) {
-    stop("`standardize_case` must be 'lower', 'upper', or NULL", call. = FALSE)
+    cli_abort("{.arg standardize_case} must be {.val lower}, {.val upper}, or NULL.")
   }
 
   # Track changes
   changes <- list()
 
   # Repair function for a single column
-  repair_column <- function(col, col_name, table_name) {
+  repair_column <- function(col) {
     if (!is.character(col)) {
       return(list(col = col, n_changes = 0L, change_types = character(0)))
     }
@@ -133,7 +126,7 @@ join_repair <- function(x, y = NULL, by,
   x_changes <- list()
   x_repaired <- x
   for (col_name in x_by) {
-    result <- repair_column(x[[col_name]], col_name, "x")
+    result <- repair_column(x[[col_name]])
     if (result$n_changes > 0) {
       x_changes[[col_name]] <- result
       if (!dry_run) {
@@ -148,7 +141,7 @@ join_repair <- function(x, y = NULL, by,
   if (!is.null(y)) {
     for (i in seq_along(y_by)) {
       col_name <- y_by[i]
-      result <- repair_column(y[[col_name]], col_name, "y")
+      result <- repair_column(y[[col_name]])
       if (result$n_changes > 0) {
         y_changes[[col_name]] <- result
         if (!dry_run) {
@@ -223,38 +216,38 @@ join_repair <- function(x, y = NULL, by,
 #' @export
 suggest_repairs <- function(report) {
   if (!is_join_report(report)) {
-    stop("`report` must be a JoinReport object", call. = FALSE)
+    cli_abort("{.arg report} must be a {.cls JoinReport} object.")
   }
 
   suggestions <- character(0)
 
   for (issue in report$issues) {
     if (issue$type == "whitespace") {
-      col <- issue$column
+      col <- deparse(issue$column)
       tbl <- if (issue$table == "x") "x" else "y"
       suggestions <- c(suggestions, sprintf(
-        '%s$%s <- trimws(%s$%s)',
+        '%s[[%s]] <- trimws(%s[[%s]])',
         tbl, col, tbl, col
       ))
     } else if (issue$type == "case_mismatch") {
-      col_x <- issue$column_x
-      col_y <- issue$column_y
+      col_x <- deparse(issue$column_x)
+      col_y <- deparse(issue$column_y)
       suggestions <- c(suggestions, sprintf(
-        '# Standardize case:\nx$%s <- tolower(x$%s)\ny$%s <- tolower(y$%s)',
+        '# Standardize case:\nx[[%s]] <- tolower(x[[%s]])\ny[[%s]] <- tolower(y[[%s]])',
         col_x, col_x, col_y, col_y
       ))
     } else if (issue$type == "empty_string") {
-      col <- issue$column
+      col <- deparse(issue$column)
       tbl <- if (issue$table == "x") "x" else "y"
       suggestions <- c(suggestions, sprintf(
-        '%s$%s[%s$%s == ""] <- NA',
+        '%s[[%s]][%s[[%s]] == ""] <- NA',
         tbl, col, tbl, col
       ))
     } else if (issue$type == "encoding") {
-      col <- issue$column
+      col <- deparse(issue$column)
       tbl <- if (issue$table == "x") "x" else "y"
       suggestions <- c(suggestions, sprintf(
-        '# Remove invisible characters:\n%s$%s <- gsub("[\\u200B\\u200C\\u200D\\uFEFF\\u00A0]", "", %s$%s, perl = TRUE)',
+        '# Remove invisible characters:\n%s[[%s]] <- gsub("[\\u200B\\u200C\\u200D\\uFEFF\\u00A0]", "", %s[[%s]], perl = TRUE)',
         tbl, col, tbl, col
       ))
     }

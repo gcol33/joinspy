@@ -48,22 +48,17 @@ join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
   expect <- match.arg(expect)
 
   # Validate inputs
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   # Check columns exist
-  missing_x <- setdiff(x_by, names(x))
-  missing_y <- setdiff(y_by, names(y))
-  if (length(missing_x) > 0) {
-    stop("Column(s) not found in x: ", paste(missing_x, collapse = ", "), call. = FALSE)
-  }
-  if (length(missing_y) > 0) {
-    stop("Column(s) not found in y: ", paste(missing_y, collapse = ", "), call. = FALSE)
-  }
+  .check_cols(x, x_by, "x")
+  .check_cols(y, y_by, "y")
 
   # Get key summaries to check cardinality
   x_summary <- .summarize_keys(x, x_by)
@@ -82,22 +77,7 @@ join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
   )
 
   # Check cardinality constraint
-  actual <- if (x_has_dups && y_has_dups) {
-    "n:m"
-  } else if (x_has_dups) {
-    "n:1"
-  } else if (y_has_dups) {
-    "1:n"
-  } else {
-    "1:1"
-  }
-
-  # Determine if constraint is satisfied
-  # 1:1 is the most restrictive, n:m is the least
-  cardinality_levels <- c("1:1" = 1, "1:n" = 2, "n:1" = 2, "n:m" = 3)
-
-  actual_level <- cardinality_levels[actual]
-  expect_level <- cardinality_levels[expect_norm]
+  actual <- .classify_cardinality(x_has_dups, y_has_dups)
 
   # Special handling for 1:n vs n:1 (they're incompatible with each other)
   violates <- FALSE
@@ -111,10 +91,10 @@ join_strict <- function(x, y, by, type = c("left", "right", "inner", "full"),
   # n:m allows everything
 
   if (violates) {
-    stop(sprintf(
-      "Cardinality violation: expected %s but found %s\n\t Left duplicates: %d, Right duplicates: %d",
-      expect, actual, x_summary$n_duplicates, y_summary$n_duplicates
-    ), call. = FALSE)
+    cli_abort(c(
+      "Cardinality violation: expected {.val {expect}} but found {.val {actual}}.",
+      "i" = "Left duplicates: {.val {x_summary$n_duplicates}}, right duplicates: {.val {y_summary$n_duplicates}}."
+    ))
   }
 
   # Perform the join via backend dispatch

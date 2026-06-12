@@ -28,6 +28,8 @@ A \code{JoinReport} object with the following components:
 \item{match_analysis}{Details of which keys will/won't match}
 \item{issues}{List of detected problems (duplicates, whitespace, etc.)}
 \item{expected_rows}{Predicted row counts for each join type}
+\item{memory_estimate}{Heuristic estimate of the result size for each join
+type, as human-readable strings}
 }
 }
 \description{

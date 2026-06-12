@@ -24,6 +24,8 @@
 #'   \item{match_analysis}{Details of which keys will/won't match}
 #'   \item{issues}{List of detected problems (duplicates, whitespace, etc.)}
 #'   \item{expected_rows}{Predicted row counts for each join type}
+#'   \item{memory_estimate}{Heuristic estimate of the result size for each join
+#'     type, as human-readable strings}
 #' }
 #'
 #' @details
@@ -56,8 +58,8 @@
 #' @export
 join_spy <- function(x, y, by, sample = NULL, ...) {
   # Validate inputs
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Store original sizes for reporting
   original_x_rows <- nrow(x)
@@ -78,31 +80,21 @@ join_spy <- function(x, y, by, sample = NULL, ...) {
   }
 
   # Handle named by vector (e.g., c("id" = "customer_id"))
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
 
   # Check columns exist
-  missing_x <- setdiff(x_by, names(x))
-  missing_y <- setdiff(y_by, names(y))
-  if (length(missing_x) > 0) {
-    stop("Column(s) not found in x: ", paste(missing_x, collapse = ", "), call. = FALSE)
-  }
-  if (length(missing_y) > 0) {
-    stop("Column(s) not found in y: ", paste(missing_y, collapse = ", "), call. = FALSE)
-  }
+  .check_cols(x, x_by, "x")
+  .check_cols(y, y_by, "y")
 
   # Get key summaries
   x_summary <- .summarize_keys(x, x_by)
   y_summary <- .summarize_keys(y, y_by)
 
   # Get keys for analysis
-  if (length(x_by) == 1) {
-    x_keys <- x[[x_by]]
-    y_keys <- y[[y_by]]
-  } else {
-    x_keys <- do.call(paste, c(x[x_by], sep = "\x1F"))
-    y_keys <- do.call(paste, c(y[y_by], sep = "\x1F"))
-  }
+  x_keys <- .make_key(x, x_by)
+  y_keys <- .make_key(y, y_by)
 
   # Match analysis
   match_analysis <- .analyze_match(x_keys, y_keys, nrow(x))
@@ -371,15 +363,18 @@ join_spy <- function(x, y, by, sample = NULL, ...) {
   }
 
   # Phase 4: Memory estimation
+  # 1.5 is a heuristic overhead factor: the result carries columns from both
+  # tables plus per-object copy overhead, so it runs larger than rows x bytes.
+  overhead_factor <- 1.5
   avg_row_bytes <- mean(c(
     as.numeric(object.size(x)) / max(nrow(x), 1),
     as.numeric(object.size(y)) / max(nrow(y), 1)
   ))
   report$memory_estimate <- list(
-    inner = .format_bytes(expected_rows$inner * avg_row_bytes * 1.5),
-    left = .format_bytes(expected_rows$left * avg_row_bytes * 1.5),
-    right = .format_bytes(expected_rows$right * avg_row_bytes * 1.5),
-    full = .format_bytes(expected_rows$full * avg_row_bytes * 1.5)
+    inner = .format_bytes(expected_rows$inner * avg_row_bytes * overhead_factor),
+    left = .format_bytes(expected_rows$left * avg_row_bytes * overhead_factor),
+    right = .format_bytes(expected_rows$right * avg_row_bytes * overhead_factor),
+    full = .format_bytes(expected_rows$full * avg_row_bytes * overhead_factor)
   )
 
   report

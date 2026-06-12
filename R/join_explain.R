@@ -32,13 +32,16 @@
 #' @export
 join_explain <- function(result, x, y, by, type = NULL) {
   # Validate inputs
-  if (!is.data.frame(result)) stop("`result` must be a data frame", call. = FALSE)
-  if (!is.data.frame(x)) stop("`x` must be a data frame", call. = FALSE)
-  if (!is.data.frame(y)) stop("`y` must be a data frame", call. = FALSE)
+  .validate_df(result, "result")
+  .validate_df(x, "x")
+  .validate_df(y, "y")
 
   # Handle named by vector
-  x_by <- if (is.null(names(by))) by else names(by)
-  y_by <- if (is.null(names(by))) by else unname(by)
+  resolved <- .resolve_by(by)
+  x_by <- resolved$x
+  y_by <- resolved$y
+  .check_cols(x, x_by, "x")
+  .check_cols(y, y_by, "y")
 
   # Row counts
   n_result <- nrow(result)
@@ -50,13 +53,8 @@ join_explain <- function(result, x, y, by, type = NULL) {
   y_summary <- .summarize_keys(y, y_by)
 
   # Match analysis
-  if (length(x_by) == 1) {
-    x_keys <- x[[x_by]]
-    y_keys <- y[[y_by]]
-  } else {
-    x_keys <- do.call(paste, c(x[x_by], sep = "\x1F"))
-    y_keys <- do.call(paste, c(y[y_by], sep = "\x1F"))
-  }
+  x_keys <- .make_key(x, x_by)
+  y_keys <- .make_key(y, y_by)
   match_info <- .analyze_match(x_keys, y_keys, n_x)
 
   # Build explanation
@@ -170,8 +168,8 @@ join_explain <- function(result, x, y, by, type = NULL) {
 #' @seealso [join_explain()], [join_spy()]
 #' @export
 join_diff <- function(before, after, by = NULL) {
-  if (!is.data.frame(before)) stop("`before` must be a data frame", call. = FALSE)
-  if (!is.data.frame(after)) stop("`after` must be a data frame", call. = FALSE)
+  .validate_df(before, "before")
+  .validate_df(after, "after")
 
   cli_h1("Join Diff")
 

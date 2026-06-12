@@ -1,3 +1,22 @@
+# joinspy 0.8.1
+
+## Bug fixes
+
+- Logged reports now record duplicate-key counts. Text and JSON logs previously left the count blank because the serializer read a mistyped field name (#1).
+- Composite (multi-column) keys with a missing component are now treated as `NA`, matching how joins handle them. This corrects NA counts, duplicate detection, and row-count predictions for composite keys (#3).
+- Predicted row counts no longer overflow to `NA` for very large joins; counts are kept as doubles (#4).
+- `%||%` is imported from rlang, so the package works on R 4.1 through 4.3 (#2).
+- Report printing and `key_check()` treat issue text as data, so braces in column names or values are no longer interpreted by cli (#5).
+- `suggest_repairs()` generates valid code for non-syntactic column names using `[[ ]]` indexing (#6).
+
+## Internal
+
+- Key resolution, composite-key construction, column checks, and cardinality classification now share single-source helpers (#7).
+- Errors use cli for consistent, classed messages.
+- JSON logging escapes backslashes and control characters.
+
+---
+
 # joinspy 0.8.0
 
 ## Multi-Backend Join Support
