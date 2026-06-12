@@ -1,4 +1,4 @@
-# joinspy 0.8.1
+# joinspy 0.8.2
 
 ## Bug fixes
 
