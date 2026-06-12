@@ -19,6 +19,7 @@
 ^ROADMAP\.md$
 ^\.github$
 ^debug_.*\.R$
+^dev_.*\.R$
 ^test_.*\.R$
 ^quick_test\.R$
 ^test_runner\.R$
