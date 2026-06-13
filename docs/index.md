@@ -1,7 +1,5 @@
 # joinspy
 
-> Small exact engines for scientific computing in R.
-
 *keys that look identical but aren’t*
 
 [![CRAN
