@@ -12,9 +12,22 @@
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><link href="../extra.css" rel="stylesheet">
 <meta property="og:title" content="Common Join Problems">
+<script>
+(function () {
+  var D = String.fromCharCode(36);
+  window.MathJax = {
+    tex: {
+      inlineMath: [[D, D], ["\\(", "\\)"]],
+      displayMath: [[D + D, D + D], ["\\[", "\\]"]]
+    },
+    chtml: { linebreaks: { automatic: true, width: "90% container" } },
+    svg: { linebreaks: { automatic: true, width: "90% container" } },
+    options: { renderActions: { addMenu: [] } }
+  };
+})();
+</script>
 </head>
 <body>
-
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -22,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">joinspy</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.8.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,7 +87,7 @@
                         <h4 data-toc-skip class="author">Gilles
 Colling</h4>
             
-            <h4 data-toc-skip class="date">2026-06-13</h4>
+            <h4 data-toc-skip class="date">2026-10-10</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/joinspy/blob/HEAD/vignettes/common-issues.Rmd" class="external-link"><code>vignettes/common-issues.Rmd</code></a></small>
       <div class="d-none name"><code>common-issues.Rmd</code></div>
@@ -93,12 +106,21 @@ the diagnosis with joinspy, and the fix. The closing section collects
 the individual tools into a numbered workflow we can follow when a join
 goes wrong and the cause is unknown.</p>
 <div class="section level2">
+<h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
+</h2>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"joinspy"</span><span class="op">)</span>            <span class="co"># CRAN</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span>                <span class="co"># development version</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/joinspy"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
 <h2 id="trailing-and-leading-whitespace">Trailing and leading whitespace<a class="anchor" aria-label="anchor" href="#trailing-and-leading-whitespace"></a>
 </h2>
 <p>The classic. Someone exports a CSV from Excel, and now half the keys
 carry a trailing space. Everything looks fine when we print the data
 frame. Nothing matches when we join.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sales</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Widget"</span>, <span class="st">"Gadget "</span>, <span class="st">" Gizmo"</span><span class="op">)</span>,</span>
 <span>  units <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span>, <span class="fl">30</span><span class="op">)</span>,</span>
@@ -141,7 +163,7 @@ frame. Nothing matches when we join.</p>
 <span><span class="co">#&gt; full_join: <span style="color: #0000BB;">5</span></span></span></code></pre></div>
 <p>Two of three keys carry whitespace that prevents matching.
 <code><a href="../reference/join_repair.html">join_repair()</a></code> strips it:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sales_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">sales</span>, by <span class="op">=</span> <span class="st">"product"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">sales_clean</span>, <span class="va">inventory</span>, by <span class="op">=</span> <span class="st">"product"</span><span class="op">)</span></span>
@@ -149,7 +171,7 @@ frame. Nothing matches when we join.</p>
 <p>When we want to see what a repair would do before committing to it,
 <code>dry_run = TRUE</code> prints the planned changes and leaves the
 data untouched:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">sales</span>, by <span class="op">=</span> <span class="st">"product"</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Repair Preview (Dry Run)</span> <span style="color: #00BBBB;">────────────────────────────────────────────────────</span></span></span>
@@ -167,7 +189,7 @@ key columns right after import, before any join, keeps the problem from
 spreading into derived tables.</p>
 <p>The problem compounds with composite keys – whitespace in
 <em>any</em> column is enough to break the match:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shipments</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  warehouse <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"East "</span>, <span class="st">"West"</span>, <span class="st">"East "</span><span class="op">)</span>,</span>
 <span>  product   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Widget"</span>, <span class="st">"Gadget "</span>, <span class="st">"Gizmo"</span><span class="op">)</span>,</span>
@@ -223,7 +245,7 @@ spaces in <code>shipments</code>, so all three rows fail to match. The
 per-column breakdown in the report shows which component of the
 composite key drags the match rate down. A single
 <code><a href="../reference/join_repair.html">join_repair()</a></code> call cleans every key column at once:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shipments_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">shipments</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"warehouse"</span>, <span class="st">"product"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">3</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">shipments_clean</span>, <span class="va">stock</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"warehouse"</span>, <span class="st">"product"</span><span class="op">)</span><span class="op">)</span></span>
@@ -238,7 +260,7 @@ used as keys before.</p>
 <p>Databases are often case-insensitive; R is not. When we pull tables
 from two different systems, one might store <code>"ABC"</code> and the
 other <code>"abc"</code>.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sensors</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  station <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"AWS-01"</span>, <span class="st">"aws-02"</span>, <span class="st">"Aws-03"</span><span class="op">)</span>,</span>
 <span>  temp <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">22.1</span>, <span class="fl">18.4</span>, <span class="fl">25.7</span><span class="op">)</span>,</span>
@@ -251,7 +273,7 @@ other <code>"abc"</code>.</p>
 <span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>None of these keys match as-is:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">metadata</span>, by <span class="op">=</span> <span class="st">"station"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
@@ -281,7 +303,7 @@ other <code>"abc"</code>.</p>
 <span><span class="co">#&gt; right_join: <span style="color: #0000BB;">3</span></span></span>
 <span><span class="co">#&gt; full_join: <span style="color: #0000BB;">6</span></span></span></code></pre></div>
 <p>We can repair both sides to a common case:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">metadata</span>, by <span class="op">=</span> <span class="st">"station"</span>, standardize_case <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">4</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">repaired</span><span class="op">$</span><span class="va">x</span>, <span class="va">repaired</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"station"</span><span class="op">)</span></span>
@@ -309,7 +331,7 @@ prevents the next data pull from reintroducing the mismatch.</p>
 <p>A key contains a non-breaking space (U+00A0) instead of a regular
 space, or a zero-width joiner crept in during a copy-paste from a PDF.
 The strings print identically but do not match.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Simulate a non-breaking space in one key</span></span>
 <span><span class="va">left</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  city <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"New York"</span>, <span class="st">"Los\u00a0Angeles"</span>, <span class="st">"Chicago"</span><span class="op">)</span>,</span>
@@ -356,7 +378,7 @@ like <code>"Los Angeles"</code> in <code>right</code>, but the
 non-breaking space makes them different byte sequences.
 <code><a href="../reference/join_repair.html">join_repair()</a></code> with <code>remove_invisible = TRUE</code>
 (the default) strips these out:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">left_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">left</span>, by <span class="op">=</span> <span class="st">"city"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">1</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">left_fixed</span>, <span class="va">right</span>, by <span class="op">=</span> <span class="st">"city"</span><span class="op">)</span></span>
@@ -364,7 +386,7 @@ non-breaking space makes them different byte sequences.
 <p>When the repair needs to live in a script that does not load joinspy,
 <code><a href="../reference/suggest_repairs.html">suggest_repairs()</a></code> turns the report into plain base R that
 we can paste anywhere:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">left</span>, <span class="va">right</span>, by <span class="op">=</span> <span class="st">"city"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="va">report</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -388,7 +410,7 @@ producing system.</p>
 will match other empty strings in a join, which is almost never what we
 want: two rows with missing identifiers get joined as though they refer
 to the same entity.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">patients</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  mrn <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"P001"</span>, <span class="st">""</span>, <span class="st">"P003"</span><span class="op">)</span>,</span>
 <span>  age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">34</span>, <span class="fl">56</span>, <span class="fl">29</span><span class="op">)</span>,</span>
@@ -435,7 +457,7 @@ issue: two empty keys do match each other, so whether that counts as a
 bug depends on what the rows mean. Here it would attach an anonymous
 visit to an anonymous patient. Converting empties to <code>NA</code>
 before joining fixes this, since NAs never match in R:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">patients_fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">patients</span>, by <span class="op">=</span> <span class="st">"mrn"</span>, empty_to_na <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">1</span> value(s)</span></span>
 <span><span class="va">patients_fixed</span><span class="op">$</span><span class="va">mrn</span></span>
@@ -443,7 +465,7 @@ before joining fixes this, since NAs never match in R:</p>
 <p>Passing <code>y</code> repairs both tables in one call; the return
 value is then a list with elements <code>x</code> and
 <code>y</code>:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">both</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">patients</span>, <span class="va">visits</span>, by <span class="op">=</span> <span class="st">"mrn"</span>, empty_to_na <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">2</span> value(s)</span></span>
 <span><span class="va">both</span><span class="op">$</span><span class="va">y</span><span class="op">$</span><span class="va">mrn</span></span>
@@ -466,7 +488,7 @@ modeling pipelines, and some file readers hand us keys stored as
 factors. A factor key holding the same labels as a character key joins
 fine, since R coerces during the merge, and <code><a href="../reference/join_spy.html">join_spy()</a></code>
 notes the type difference:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">surveys</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North"</span>, <span class="st">"South"</span>, <span class="st">"East"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  count <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">12</span>, <span class="fl">7</span>, <span class="fl">30</span><span class="op">)</span></span>
@@ -509,7 +531,7 @@ notes the type difference:</p>
 the factor will be coerced. The trap is what factors hide. The string
 checks in <code><a href="../reference/join_spy.html">join_spy()</a></code> run on character columns only, so
 whitespace buried inside factor labels goes unreported:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North "</span>, <span class="st">"South"</span><span class="op">)</span><span class="op">)</span>, richness <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">9</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">plots</span>, <span class="va">habitats</span>, by <span class="op">=</span> <span class="st">"site"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -541,7 +563,7 @@ whitespace buried inside factor labels goes unreported:</p>
 <p>The match analysis still does its job (1 of 2 keys matches), but
 nothing in the issue list says why. Converting to character first
 surfaces the cause:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plots</span><span class="op">$</span><span class="va">site</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">plots</span><span class="op">$</span><span class="va">site</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">plots</span>, <span class="va">habitats</span>, by <span class="op">=</span> <span class="st">"site"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -576,7 +598,7 @@ surfaces the cause:</p>
 <code><a href="../reference/join_repair.html">join_repair()</a></code> follows the same character-only rule: called
 on the factor version it returns the data unchanged, with no message.
 After the conversion it repairs the key as usual:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plots_clean</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">plots</span>, by <span class="op">=</span> <span class="st">"site"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">1</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">plots_clean</span>, <span class="va">habitats</span>, by <span class="op">=</span> <span class="st">"site"</span><span class="op">)</span></span>
@@ -585,7 +607,7 @@ After the conversion it repairs the key as usual:</p>
 their level sets. Levels that exist on only one side are reported even
 when no data row uses them, which catches lookup tables built against a
 stale set of categories:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">surveys_f</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  site <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North"</span>, <span class="st">"South"</span><span class="op">)</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North"</span>, <span class="st">"South"</span>, <span class="st">"West"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
@@ -624,7 +646,7 @@ level unique to each side. The case section mentioned the
 level-versus-label trap; here it is concretely.
 <code><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric()</a></code> on a factor returns the internal level
 codes:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">plot_ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"10"</span>, <span class="st">"20"</span>, <span class="st">"30"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">plot_ids</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 1 2 3</span></span>
@@ -644,7 +666,7 @@ the safe route.</p>
 mismatches, untouched by whitespace and case repairs, that
 <code><a href="../reference/join_spy.html">join_spy()</a></code> flags when it finds keys in one table with no
 counterpart in the other.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  sku <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"WDG-100"</span>, <span class="st">"GDG-200"</span>, <span class="st">"GZM-300"</span><span class="op">)</span>,</span>
 <span>  qty <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">12</span>, <span class="fl">8</span><span class="op">)</span>,</span>
@@ -663,7 +685,7 @@ between unmatched keys. When two keys differ by only one or two
 characters, the report flags them as near-matches; <code>GZM-300</code>
 and <code>GZM-301</code> sit at edit distance 1. Here is a clearer
 example with multiple near-matches:</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">employees</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Johnson"</span>, <span class="st">"Smithe"</span>, <span class="st">"O'Brian"</span>, <span class="st">"Williams"</span><span class="op">)</span>,</span>
 <span>  dept <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sales"</span>, <span class="st">"R&amp;D"</span>, <span class="st">"Ops"</span>, <span class="st">"HR"</span><span class="op">)</span>,</span>
@@ -701,7 +723,7 @@ symptom of two systems generating IDs independently.</p>
 <p>Duplicate keys cause row multiplication. A left join on a key that
 appears twice in the right table doubles the corresponding rows from the
 left.</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">250</span>, <span class="fl">75</span><span class="op">)</span></span>
@@ -741,7 +763,7 @@ left.</p>
 <span><span class="co">#&gt; right_join: <span style="color: #0000BB;">4</span></span></span>
 <span><span class="co">#&gt; full_join: <span style="color: #0000BB;">4</span></span></span></code></pre></div>
 <p><code><a href="../reference/key_duplicates.html">key_duplicates()</a></code> shows which rows are responsible:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_duplicates.html">key_duplicates</a></span><span class="op">(</span><span class="va">addresses</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   customer_id address .n_duplicates</span></span>
 <span><span class="co">#&gt; 2           2      LA             2</span></span>
@@ -750,7 +772,7 @@ left.</p>
 count attached. <code>keep = "first"</code> or
 <code>keep = "last"</code> reduce the output to one row per key, which
 doubles as a quick deduplication candidate:</p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_duplicates.html">key_duplicates</a></span><span class="op">(</span><span class="va">addresses</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, keep <span class="op">=</span> <span class="st">"first"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   customer_id address .n_duplicates</span></span>
 <span><span class="co">#&gt; 2           2      LA             2</span></span></code></pre></div>
@@ -766,7 +788,7 @@ regression when next month’s extract grows a second row per
 customer.</p>
 <p>When <em>both</em> sides have duplicates, each key group produces a
 Cartesian product:</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders_dup</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"B"</span><span class="op">)</span>,</span>
 <span>  qty     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">20</span>, <span class="fl">5</span>, <span class="fl">15</span><span class="op">)</span></span>
@@ -809,7 +831,7 @@ Cartesian product:</p>
 so a join produces 2 x 3 = 6 rows for that key alone.
 <code><a href="../reference/check_cartesian.html">check_cartesian()</a></code> quantifies the total expansion before we
 run the join:</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/check_cartesian.html">check_cartesian</a></span><span class="op">(</span><span class="va">orders_dup</span>, <span class="va">prices_dup</span>, by <span class="op">=</span> <span class="st">"product"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> No Cartesian product risk (expansion factor: <span style="color: #0000BB;">2</span>x)</span></span></code></pre></div>
 <p>By default it raises the alarm when the result would exceed 10 times
@@ -821,7 +843,7 @@ cut-off.</p>
 </h2>
 <p><code>NA</code> never equals <code>NA</code> in R. This is by design,
 but it surprises people who expect two missing values to match.</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="cn">NA</span>, <span class="fl">3</span>, <span class="cn">NA</span><span class="op">)</span>,</span>
 <span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">200</span>, <span class="fl">300</span>, <span class="fl">400</span><span class="op">)</span></span>
@@ -863,7 +885,7 @@ but it surprises people who expect two missing values to match.</p>
 <span><span class="co">#&gt; full_join: <span style="color: #0000BB;">6</span></span></span></code></pre></div>
 <p>We can either remove rows with NA keys before joining, or replace NAs
 with a sentinel value if we actually want them to match:</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Remove</span></span>
 <span><span class="va">orders_clean</span> <span class="op">&lt;-</span> <span class="va">orders</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">orders</span><span class="op">$</span><span class="va">customer_id</span><span class="op">)</span>, <span class="op">]</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">orders_clean</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
@@ -873,7 +895,7 @@ with a sentinel value if we actually want them to match:</p>
 say unattributed orders that should collect under a single placeholder
 customer, the sentinel route makes them joinable. We replace the NA with
 an impossible ID on both sides:</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders_s</span> <span class="op">&lt;-</span> <span class="va">orders</span></span>
 <span><span class="va">customers_s</span> <span class="op">&lt;-</span> <span class="va">customers</span></span>
 <span><span class="va">orders_s</span><span class="op">$</span><span class="va">customer_id</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">orders_s</span><span class="op">$</span><span class="va">customer_id</span><span class="op">)</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="op">-</span><span class="fl">1</span></span>
@@ -910,7 +932,7 @@ an impossible ID on both sides:</p>
 warns about something new: the sentinel appears twice on the left, so it
 is a duplicate key, and both formerly missing orders will attach to the
 same <code>"Unknown"</code> row:</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">orders_s</span>, <span class="va">customers_s</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   customer_id amount    name</span></span>
 <span><span class="co">#&gt; 1          -1    200 Unknown</span></span>
@@ -934,7 +956,7 @@ this section.</p>
 <p>One table stores IDs as integers, the other as character strings.
 <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> coerces silently; <code><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">dplyr::left_join()</a></code>
 refuses. Either way, we want to know about it before the join.</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">invoices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  product_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>  total <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">500</span>, <span class="fl">300</span>, <span class="fl">150</span><span class="op">)</span></span>
@@ -977,14 +999,14 @@ refuses. Either way, we want to know about it before the join.</p>
 <code>POSIXct</code> vs. <code>Date</code>, where the join either fails
 or coerces through numeric intermediaries. <code><a href="../reference/join_spy.html">join_spy()</a></code> flags
 the type mismatch regardless of the types involved.</p>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">invoices</span><span class="op">$</span><span class="va">product_id</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="va">invoices</span><span class="op">$</span><span class="va">product_id</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">invoices</span>, <span class="va">products</span>, by <span class="op">=</span> <span class="st">"product_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Key check passed: no issues detected</span></span></code></pre></div>
 <p>The repair direction matters: converting the numeric side to
 character, as above, is lossless. Going the other way destroys any key
 with leading zeros:</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"007"</span>, <span class="st">"042"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">ids</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "7"  "42"</span></span></code></pre></div>
@@ -1002,7 +1024,7 @@ the type at import (<code>colClasses</code> in base R,
 <p>Numeric keys produced by arithmetic carry floating-point noise. Three
 depths built by accumulating 0.1 look identical to hand-typed values
 when printed, and the third one is different:</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">readings</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>depth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span>, oxygen <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8.1</span>, <span class="fl">7.4</span>, <span class="fl">6.9</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">layers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  depth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.1</span>, <span class="fl">0.2</span>, <span class="fl">0.3</span><span class="op">)</span>,</span>
@@ -1016,7 +1038,7 @@ when printed, and the third one is different:</p>
 <p>The accumulated third value is 0.30000000000000004, so the comparison
 with 0.3 fails. <code><a href="../reference/join_spy.html">join_spy()</a></code> warns about the key type and the
 match analysis shows the damage:</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">readings</span>, <span class="va">layers</span>, by <span class="op">=</span> <span class="st">"depth"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Join Diagnostic Report</span> <span style="color: #00BBBB;">──────────────────────────────────────────────────────</span></span></span>
@@ -1052,7 +1074,7 @@ doubles, on both tables here, because any such key can fail this way.
 Pinpointing which values differ by an epsilon is outside joinspy’s
 string checks; that part is on us, and the standard fix is to remove the
 noise before joining:</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">readings</span><span class="op">$</span><span class="va">depth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">readings</span><span class="op">$</span><span class="va">depth</span>, <span class="fl">6</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="va">readings</span><span class="op">$</span><span class="va">depth</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="va">layers</span><span class="op">$</span><span class="va">depth</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
@@ -1069,7 +1091,7 @@ identifier; an explicit ID column upstream removes the temptation.</p>
 <p>When both tables have duplicate keys, we get a Cartesian product
 within each key group. With real data this can turn a 10,000-row join
 into a million-row table.</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  order_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>  item <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"C"</span>, <span class="st">"D"</span>, <span class="st">"E"</span><span class="op">)</span>,</span>
@@ -1085,14 +1107,14 @@ into a million-row table.</p>
 <span><span class="fu"><a href="../reference/check_cartesian.html">check_cartesian</a></span><span class="op">(</span><span class="va">items</span>, <span class="va">payments</span>, by <span class="op">=</span> <span class="st">"order_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> No Cartesian product risk (expansion factor: <span style="color: #0000BB;">2</span>x)</span></span></code></pre></div>
 <p><code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> tells us the relationship type:</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/detect_cardinality.html">detect_cardinality</a></span><span class="op">(</span><span class="va">items</span>, <span class="va">payments</span>, by <span class="op">=</span> <span class="st">"order_id"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Detected cardinality: <span style="color: #0000BB;">"n:m"</span></span></span>
 <span><span class="co">#&gt; Left duplicates: <span style="color: #0000BB;">2</span> key(s)</span></span>
 <span><span class="co">#&gt; Right duplicates: <span style="color: #0000BB;">2</span> key(s)</span></span></code></pre></div>
 <p>If we expected a one-to-many relationship, <code><a href="../reference/join_strict.html">join_strict()</a></code>
 will stop us before the explosion happens:</p>
-<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">items</span>, <span class="va">payments</span>, by <span class="op">=</span> <span class="st">"order_id"</span>, type <span class="op">=</span> <span class="st">"left"</span>, expect <span class="op">=</span> <span class="st">"1:n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;"> in `join_strict()`:</span></span></span>
 <span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Cardinality violation: expected <span style="color: #0000BB;">"1:n"</span> but found <span style="color: #0000BB;">"n:m"</span>.</span></span>
@@ -1115,7 +1137,7 @@ cardinality check is the cheapest way to notice.</p>
 </h2>
 <p>An inner join returns zero rows, and downstream code may not check
 for an empty data frame.</p>
-<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">system_a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  user_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"USR-001"</span>, <span class="st">"USR-002"</span>, <span class="st">"USR-003"</span><span class="op">)</span>,</span>
 <span>  score <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">85</span>, <span class="fl">90</span>, <span class="fl">78</span><span class="op">)</span>,</span>
@@ -1154,7 +1176,7 @@ for an empty data frame.</p>
 <p>Zero overlap – the keys use completely different formats, and no
 amount of trimming or case-folding will help. We need a mapping table or
 a transformation that extracts the numeric part:</p>
-<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">system_a</span><span class="op">$</span><span class="va">user_num</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"^USR-0*"</span>, <span class="st">""</span>, <span class="va">system_a</span><span class="op">$</span><span class="va">user_id</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/key_check.html">key_check</a></span><span class="op">(</span><span class="va">system_a</span>, <span class="va">system_b</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"user_num"</span> <span class="op">=</span> <span class="st">"user_id"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Key check passed: no issues detected</span></span></code></pre></div>
@@ -1175,7 +1197,7 @@ anything; the next section covers that syntax.</p>
 <code>patient_id</code> in the admissions extract is <code>mrn</code> in
 the registry. A named <code>by</code> vector maps left names to right
 names, and every joinspy function accepts it:</p>
-<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">admissions</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"P-01 "</span>, <span class="st">"P-02"</span>, <span class="st">"P-03"</span><span class="op">)</span>,</span>
 <span>  ward <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"B"</span><span class="op">)</span>,</span>
@@ -1223,7 +1245,7 @@ and the diagnostics run as usual: the whitespace warning points at
 the same vector, with <code><a href="../reference/join_repair.html">join_repair()</a></code> fixing
 <code>patient_id</code> on the left and <code>mrn</code> on the
 right:</p>
-<div class="sourceCode" id="cb44"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">admissions</span>, <span class="va">registry</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patient_id"</span> <span class="op">=</span> <span class="st">"mrn"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">1</span> value(s)</span></span>
 <span><span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">fixed</span><span class="op">$</span><span class="va">x</span>, <span class="va">fixed</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"patient_id"</span> <span class="op">=</span> <span class="st">"mrn"</span><span class="op">)</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -1246,7 +1268,7 @@ in one place.</p>
 join we usually do not know which failure we have, so this is the order
 we check in, walked through on a pair of tables that carries several
 problems at once:</p>
-<div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb46"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shipments</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  order_ref <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ORD-1 "</span>, <span class="st">"ORD-2"</span>, <span class="st">"ORD-2"</span>, <span class="st">"ORD-3"</span>, <span class="cn">NA</span><span class="op">)</span>,</span>
 <span>  qty <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">10</span>, <span class="fl">25</span>, <span class="fl">5</span>, <span class="fl">12</span>, <span class="fl">7</span><span class="op">)</span>,</span>
@@ -1262,7 +1284,7 @@ problems at once:</p>
 bottom.</strong> The match rate and the issue list classify the problem
 before we attempt any fix. For large tables, <code>sample = 1000</code>
 runs the same diagnostics on a random subset first.</p>
-<div class="sourceCode" id="cb46"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">shipments</span>, <span class="va">invoices</span>, by <span class="op">=</span> <span class="st">"order_ref"</span><span class="op">)</span></span>
 <span><span class="va">report</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -1315,7 +1337,7 @@ above).</p></li>
 characters, and empty strings in one call;
 <code>suggest_repairs(report)</code> prints the equivalent base R when
 the fix has to live elsewhere.</p>
-<div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb48"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shipments_repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">shipments</span>, by <span class="op">=</span> <span class="st">"order_ref"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Repaired <span style="color: #0000BB;">1</span> value(s)</span></span></code></pre></div>
 <p><strong>Step 3: inspect the duplicates.</strong>
@@ -1323,7 +1345,7 @@ the fix has to live elsewhere.</p>
 <code><a href="../reference/detect_cardinality.html">detect_cardinality()</a></code> names the relationship, and
 <code><a href="../reference/check_cartesian.html">check_cartesian()</a></code> bounds the blow-up for the worst
 keys.</p>
-<div class="sourceCode" id="cb48"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb49"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/key_duplicates.html">key_duplicates</a></span><span class="op">(</span><span class="va">shipments_repaired</span>, by <span class="op">=</span> <span class="st">"order_ref"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   order_ref qty .n_duplicates</span></span>
 <span><span class="co">#&gt; 2     ORD-2  25             2</span></span>
@@ -1338,7 +1360,7 @@ accident, we deduplicate or aggregate here.</p>
 <p><strong>Step 4: decide what NA keys mean.</strong> Dropping loses the
 7-unit shipment with no reference; the sentinel route from the NA
 section keeps it under a placeholder. Here we drop:</p>
-<div class="sourceCode" id="cb49"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb50"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shipments_repaired</span> <span class="op">&lt;-</span> <span class="va">shipments_repaired</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">shipments_repaired</span><span class="op">$</span><span class="va">order_ref</span><span class="op">)</span>, <span class="op">]</span></span></code></pre></div>
 <p><strong>Step 5: align types.</strong> Nothing to fix in this example;
 when the report shows a numeric column joining a character column, we
@@ -1348,7 +1370,7 @@ import.</p>
 <code><a href="../reference/join_strict.html">join_strict()</a></code> performs the join only if the cardinality
 matches what we declared, so the data model decision from step 3 becomes
 executable:</p>
-<div class="sourceCode" id="cb50"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb51"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">shipments_repaired</span>, <span class="va">invoices</span>, by <span class="op">=</span> <span class="st">"order_ref"</span>,</span>
 <span>                      type <span class="op">=</span> <span class="st">"left"</span>, expect <span class="op">=</span> <span class="st">"n:1"</span><span class="op">)</span></span>
 <span><span class="va">result</span></span>
@@ -1360,7 +1382,7 @@ executable:</p>
 <p><strong>Step 7: audit the result.</strong>
 <code><a href="../reference/join_explain.html">join_explain()</a></code> accounts for the difference between input
 and output row counts after the fact:</p>
-<div class="sourceCode" id="cb51"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/join_explain.html">join_explain</a></span><span class="op">(</span><span class="va">result</span>, <span class="va">shipments_repaired</span>, <span class="va">invoices</span>,</span>
 <span>             by <span class="op">=</span> <span class="st">"order_ref"</span>, type <span class="op">=</span> <span class="st">"left"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -1386,16 +1408,16 @@ same comparison oriented around column changes.</p>
 <code><a href="../reference/set_log_file.html">set_log_file()</a></code> routes every subsequent
 <code>*_join_spy()</code> report to a file, which is how we debug a join
 that went wrong last Tuesday:</p>
-<div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb53"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">log_file</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">log_file</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp4OayX0\file23f83fab381c.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\WINDOWS\TEMP\RtmpwlfR60\file509ca9b6a3.log</span></span></span>
 <span><span class="va">audited</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">shipments_repaired</span>, <span class="va">invoices</span>,</span>
 <span>                         by <span class="op">=</span> <span class="st">"order_ref"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="cn">NULL</span><span class="op">)</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging disabled</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">log_file</span><span class="op">)</span><span class="op">[</span><span class="fl">2</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] "Logged: 2026-06-13 00:54:01"                                 </span></span>
+<span><span class="co">#&gt; [1] "Logged: 2026-10-10 14:38:23"                                 </span></span>
 <span><span class="co">#&gt; [2] "------------------------------------------------------------"</span></span>
 <span><span class="co">#&gt; [3] "Join Key: order_ref"                                         </span></span>
 <span><span class="co">#&gt; [4] ""                                                            </span></span>
@@ -1410,7 +1432,7 @@ switches the format for machine consumption.</p>
 <p><strong>Step 9: for multi-join pipelines, check the whole
 chain.</strong> <code><a href="../reference/analyze_join_chain.html">analyze_join_chain()</a></code> runs the step 1
 diagnostic at every link and reports where the first problem enters:</p>
-<div class="sourceCode" id="cb53"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb54"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>order_id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, customer_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">customers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>customer_id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, region_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">regions</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>region_id <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"North"</span>, <span class="st">"South"</span><span class="op">)</span><span class="op">)</span></span>
@@ -1472,7 +1494,7 @@ joinspy</p></li>
 </div>
 
 <div class="pkgdown-footer-right">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.0.</p>
+  <p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.2.1.</p>
 </div>
 
     </footer>
@@ -1482,6 +1504,5 @@ joinspy</p></li>
 
 
 
-  
-</body>
+  </body>
 </html>
