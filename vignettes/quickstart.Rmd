@@ -27,6 +27,15 @@ joinspy performs the actual join through the engine that matches the data: plain
 
 This vignette is the tour: a taste of every feature, with pointers to the dedicated vignettes for depth. `vignette("why-keys-dont-match")` covers string forensics, `vignette("common-issues")` catalogues problems and fixes, `vignette("backends")` covers the three join engines, and `vignette("production")` covers logging and pipeline patterns.
 
+## Installation
+
+```{r, eval = FALSE}
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## String Diagnostics
 
 The keys *look* identical but differ at the byte level: a trailing space, a case mismatch, an invisible Unicode character. These differences don't show up in `str()` or `summary()` output, but they determine whether a join matches. `join_spy()` checks every key column on both sides and reports what it finds, grouped by issue type and tagged with a severity. This section walks through the categories one at a time; `vignette("why-keys-dont-match")` treats each in depth.

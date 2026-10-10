@@ -40,6 +40,15 @@ assertions, silent instrumented joins, programmatic report inspection,
 cardinality guards, unit tests for join contracts, logging, multi-join chain
 analysis, and finally what all of this costs at runtime.
 
+## Installation
+
+```{r, eval = FALSE}
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## Assertions with key_check()
 
 `key_check()` returns a single logical -- `TRUE` if no issues were detected,

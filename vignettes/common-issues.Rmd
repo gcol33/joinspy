@@ -29,6 +29,15 @@ symptom, a small dataset that reproduces it, the diagnosis with joinspy, and
 the fix. The closing section collects the individual tools into a numbered
 workflow we can follow when a join goes wrong and the cause is unknown.
 
+## Installation
+
+```{r, eval = FALSE}
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## Trailing and leading whitespace
 
 The classic. Someone exports a CSV from Excel, and now half the keys carry a
