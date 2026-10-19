@@ -3,7 +3,6 @@
 <url><loc>https://gillescolling.com/joinspy/articles/backends.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/common-issues.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/index.html</loc></url>
-<url><loc>https://gillescolling.com/joinspy/articles/introduction.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/production.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/quickstart.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/articles/why-keys-dont-match.html</loc></url>
@@ -63,8 +62,6 @@
 <url><loc>https://gillescolling.com/joinspy/reference/log_report.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/new_join_report.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/plot.JoinReport.html</loc></url>
-<url><loc>https://gillescolling.com/joinspy/reference/plot_summary.html</loc></url>
-<url><loc>https://gillescolling.com/joinspy/reference/plot_venn.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/print.JoinReport.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/right_join_spy.html</loc></url>
 <url><loc>https://gillescolling.com/joinspy/reference/set_log_file.html</loc></url>

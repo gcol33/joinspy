@@ -52,6 +52,16 @@ covers the three join engines, and
 [`vignette("production")`](https://gillescolling.com/joinspy/articles/production.md)
 covers logging and pipeline patterns.
 
+## Installation
+
+``` r
+
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## String Diagnostics
 
 The keys *look* identical but differ at the byte level: a trailing
@@ -752,7 +762,7 @@ key counts in the three regions and the match rate in the subtitle:
 plot(report)
 ```
 
-![](quickstart_files/figure-html/unnamed-chunk-18-1.png)
+![](quickstart_files/figure-html/unnamed-chunk-19-1.svg)
 
 The picture makes the diagnosis immediate: two keys live only in `sales`
 (the damaged Paris and Berlin), two are shared, and three live only in
@@ -1674,7 +1684,7 @@ machine-readable output, and `.rds` for the complete R object.
 report <- join_spy(patients, labs, by = "patient_id")
 tmp <- tempfile(fileext = ".log")
 log_report(report, tmp, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpkPPrva\file95e411dc15d5.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpSems93\filea0b47bdba1e.log
 cat(readLines(tmp)[1:8], sep = "\n")
 #> Join Key: patient_id
 #> 
@@ -1695,7 +1705,7 @@ history. The JSON format carries the same numbers as structured fields:
 
 tmp_json <- tempfile(fileext = ".json")
 log_report(report, tmp_json, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpkPPrva\file95e478f62867.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpSems93\filea0b47ba93844.json
 cat(readLines(tmp_json)[1:8], sep = "\n")
 #> {
 #>   "by": "patient_id",
@@ -1729,7 +1739,7 @@ returns the currently configured path, or `NULL` when logging is off.
 
 log_path <- tempfile(fileext = ".log")
 set_log_file(log_path)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpkPPrva\file95e4393b17a6.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSems93\filea0b47a265229.log
 identical(get_log_file(), log_path)
 #> [1] TRUE
 ```

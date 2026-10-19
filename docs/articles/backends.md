@@ -22,6 +22,16 @@ vignette closes with how backends interact with
 and the report flow, and with guidance on when an override earns its
 keep.
 
+## Installation
+
+``` r
+
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## Auto-detection
 
 When we call
@@ -733,7 +743,7 @@ t_spy <- system.time(report <- join_spy(big_x, big_y, by = "id"))
 round(c(base = t_base[["elapsed"]], dplyr = t_dplyr[["elapsed"]],
         data.table = t_dt[["elapsed"]], diagnostics = t_spy[["elapsed"]]), 3)
 #>        base       dplyr  data.table diagnostics 
-#>        0.31        0.29        0.30        0.55
+#>        0.31        0.31        0.32        0.31
 ```
 
 The three wrapper timings land close together, and the last entry shows

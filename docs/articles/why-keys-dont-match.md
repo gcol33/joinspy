@@ -18,6 +18,16 @@ which checks
 [`join_spy()`](https://gillescolling.com/joinspy/reference/join_spy.md)
 runs against them. The scenarios then put both to work.
 
+## Installation
+
+``` r
+
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
 ## What a Join Actually Compares
 
 Every join reduces to the same primitive: for each key in one table,

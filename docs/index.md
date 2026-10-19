@@ -25,6 +25,18 @@ inspects the key columns first, names the exact values that won’t match
 and why, predicts the result size for each join type, and hands you the
 code to fix them.
 
+## Installation
+
+``` r
+
+install.packages("joinspy")            # CRAN
+
+install.packages("pak")                # development version
+pak::pak("gcol33/joinspy")
+```
+
+## Quick start
+
 ``` r
 
 library(joinspy)
@@ -151,16 +163,6 @@ traces a multi-step A-B-C sequence. Inputs dispatch to their native
 engine: tibbles use dplyr, data.tables use data.table, plain data frames
 use base [`merge()`](https://rdrr.io/r/base/merge.html), and the class
 survives the diagnose-repair-join cycle.
-
-## Installation
-
-``` r
-
-install.packages("joinspy")            # CRAN
-
-install.packages("pak")                # development version
-pak::pak("gcol33/joinspy")
-```
 
 ## Documentation
 
