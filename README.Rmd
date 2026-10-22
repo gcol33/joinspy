@@ -1,0 +1,164 @@
+---
+output: github_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(width = 80)
+```
+
+# joinspy
+
+*keys that look identical but aren't*
+
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml)
+[![Codecov test coverage](https://codecov.io/gh/gcol33/joinspy/graph/badge.svg)](https://app.codecov.io/gh/gcol33/joinspy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CRAN status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
+<!-- badges: end -->
+
+joinspy checks the key columns of two tables before they are joined and reports the values that will not match, such as keys with a trailing space, a different case or an invisible Unicode character.
+
+R compares join keys byte by byte, so `"B "` and `"B"` are different keys and the join drops the row without a warning. The diagnostic report names each affected value, says why it fails to match and predicts the row count of every join type. You can then preview the repairs, apply them, or copy the generated code into your own script. joinspy supports:
+
+- **Repairing keys.** [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.html) trims whitespace, standardises case and removes invisible characters, with `dry_run = TRUE` to preview the changes. `suggest_repairs()` prints the same fixes as R code.
+- **Predicting the result size.** The report gives the row count of the inner, left, right and full join from the key multiplicities, so a many-to-many key shows up before the join multiplies the rows.
+- **Declaring the relationship of the keys.** [`join_strict()`](https://gillescolling.com/joinspy/reference/join_strict.html) joins only when the keys hold the declared relationship (`"1:1"`, `"1:n"`, `"n:1"` or `"n:m"`) and stops with an error otherwise.
+- **Explaining a join that already ran.** [`join_explain()`](https://gillescolling.com/joinspy/reference/join_explain.html) compares the row count of a result with its two inputs and lists the keys that had no match.
+- **Three join engines.** Tibbles are joined with [dplyr](https://dplyr.tidyverse.org/), data.tables with [data.table](https://r-datatable.com) and plain data frames with base `merge()`, and the class of the input is kept through diagnosis, repair and join.
+
+## Installation
+
+```r
+install.packages("joinspy")
+```
+
+Development version:
+
+```r
+# install.packages("pak")
+pak::pak("gcol33/joinspy")
+```
+
+## Usage
+
+1. Check the keys of the two tables with `join_spy()`.
+2. Fix whitespace, case and invisible characters with `join_repair()`.
+3. Join the repaired tables with `left_join_spy()` or one of the other wrappers, which run the same check and attach the report to the result.
+
+`join_spy()` takes two data frames, tibbles or data.tables and the key columns in `by`: the shared column names, or a named vector such as `c("id" = "customer_id")` when the names differ.
+
+```{r spy}
+library(joinspy)
+
+orders <- data.frame(
+  id     = c("A", "B ", "c", "D"),
+  amount = c(100, 200, 300, 400)
+)
+customers <- data.frame(
+  id   = c("A", "B", "C", "E"),
+  name = c("Alice", "Bob", "Carol", "Eve")
+)
+join_spy(orders, customers, by = "id")
+```
+
+Only `"A"` matches as written. `"B "` carries a trailing space and `"c"` differs from `"C"` in case, so each would match after a repair. `"D"` has no counterpart in `customers` and stays unmatched whatever is repaired.
+
+```{r repair}
+fixed <- join_repair(orders, customers, by = "id", standardize_case = "upper")
+joined <- left_join_spy(fixed$x, fixed$y, by = "id", .quiet = TRUE)
+joined
+```
+
+Three of the four orders now find their customer, and order `"D"` keeps an `NA` name. `last_report()` returns the report of the most recent join.
+
+## What the report checks
+
+Each key column is checked for:
+
+- leading and trailing whitespace;
+- values that differ between the two tables only in case;
+- invisible Unicode characters (zero-width spaces, byte order marks, non-breaking spaces) and mixed encodings;
+- empty strings, which match each other in a join while `NA` does not;
+- type and factor-level mismatches between the two tables;
+- floating-point keys that may not compare equal;
+- near matches within a Levenshtein distance of two, which may be typos.
+
+[Why Your Keys Don't Match](https://gillescolling.com/joinspy/articles/why-keys-dont-match.html) shows each case at the byte level, and [Common Join Problems](https://gillescolling.com/joinspy/articles/common-issues.html) gives the fix for each.
+
+## Declaring the relationship of the keys
+
+A join that should attach one customer to each order can multiply rows when a key repeats. `join_strict()` takes the expected relationship and stops before joining when the data breaks it:
+
+```{r strict, error = TRUE}
+items <- data.frame(id = c("A", "A", "B"), qty = c(2, 1, 5))
+join_strict(customers, items, by = "id", expect = "1:1")
+```
+
+`detect_cardinality()` reports the relationship the keys actually have. [Joins in Production](https://gillescolling.com/joinspy/articles/production.html) uses these checks as gates in a pipeline, with logged reports.
+
+## Explaining a join that already ran
+
+`join_explain()` takes a result and the two tables it came from, and accounts for its row count:
+
+```{r explain}
+result <- merge(orders, customers, by = "id", all.x = TRUE)
+join_explain(result, orders, customers, by = "id", type = "left")
+```
+
+## Related packages
+
+| Package | Focus |
+|---------|-------|
+| [dplyr](https://dplyr.tidyverse.org/) 1.1+ | Cardinality checks via the `relationship` argument |
+| [powerjoin](https://github.com/moodymudskipper/powerjoin) | Configurable join checks and key preprocessing |
+| [joyn](https://github.com/randrescastaneda/joyn) | Per-row match-status reporting variable |
+| [tidylog](https://github.com/elbersb/tidylog) | Logs row count changes after joins |
+
+joinspy works on the key values themselves: it names the values that fail to match, gives the reason and can repair them.
+
+## Documentation
+
+Start with the [Quick Start](https://gillescolling.com/joinspy/articles/quickstart.html): every feature on small examples, from the first diagnosis to logging.
+
+- [Why Your Keys Don't Match](https://gillescolling.com/joinspy/articles/why-keys-dont-match.html): whitespace, case, encoding and typos at the byte level.
+- [Common Join Problems](https://gillescolling.com/joinspy/articles/common-issues.html): each problem with its diagnosis and fix.
+- [Joins in Production](https://gillescolling.com/joinspy/articles/production.html): key assertions, cardinality guards, tests and logging in pipelines.
+- [Working with Backends](https://gillescolling.com/joinspy/articles/backends.html): how base R, dplyr and data.table are chosen and where they differ.
+- [Full reference](https://gillescolling.com/joinspy/reference/): every function, grouped by job.
+
+## Getting help
+
+Questions and bug reports go to the [GitHub issues](https://github.com/gcol33/joinspy/issues). A bug report is easiest to act on with a small reproducible example, for instance made with [reprex](https://reprex.tidyverse.org/).
+
+## Contributing
+
+Pull requests are welcome; see the [contributing guide](https://gillescolling.com/joinspy/CONTRIBUTING.html).
+
+## Support
+
+> "Software is like sex: it's better when it's free." — Linus Torvalds
+
+I'm a PhD student who builds R packages in my free time because I believe good tools should be free and open. I started these projects for my own work and figured others might find them useful too.
+
+If this package saved you some time, buying me a coffee is a nice way to say thanks. It helps with my coffee addiction.
+
+[![Buy Me A Coffee](https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/gcol33)
+
+## License
+
+joinspy is licensed under MIT.
+
+## Citation
+
+```{r citation, echo = FALSE, results = "asis"}
+cit <- citation("joinspy")
+fence <- function(lang, x) cat("```", lang, "\n", paste(x, collapse = "\n\n"), "\n```\n\n", sep = "")
+cat(attr(cit, "mheader"), "\n\n", sep = "")
+fence("text", format(cit, style = "text"))
+cat("BibTeX:\n\n")
+fence("bibtex", format(cit, style = "bibtex"))
+```
+
+Download the citation as [BibTeX](https://gillescolling.com/joinspy/joinspy.bib) or [RIS](https://gillescolling.com/joinspy/joinspy.ris).

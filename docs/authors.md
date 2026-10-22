@@ -8,15 +8,17 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/gcol33/joinspy/blob/HEAD/DESCRIPTION)
+[`inst/CITATION`](https://github.com/gcol33/joinspy/blob/HEAD/inst/CITATION)
 
-Colling G (2026). *joinspy: Diagnostic Tools for Data Frame Joins*. R
-package version 0.8.3, <https://gillescolling.com/joinspy/>.
+Colling G (2026). *joinspy: Diagnostic Tools for Data Frame Joins*.
+[doi:10.32614/CRAN.package.joinspy](https://doi.org/10.32614/CRAN.package.joinspy).
+R package version 0.8.3, <https://gillescolling.com/joinspy/>.
 
-    @Manual{,
+    @Manual{colling2026joinspy,
       title = {joinspy: Diagnostic Tools for Data Frame Joins},
       author = {Gilles Colling},
       year = {2026},
       note = {R package version 0.8.3},
+      doi = {10.32614/CRAN.package.joinspy},
       url = {https://gillescolling.com/joinspy/},
     }

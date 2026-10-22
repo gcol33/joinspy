@@ -29,3 +29,7 @@
 ^[Nn][Uu][Ll]$
 ^\.covrignore$
 ^cookies\.txt$
+^README\.Rmd$
+^\.run.*$
+^sidecars$
+^CITATION\.cff$

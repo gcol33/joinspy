@@ -743,7 +743,7 @@ t_spy <- system.time(report <- join_spy(big_x, big_y, by = "id"))
 round(c(base = t_base[["elapsed"]], dplyr = t_dplyr[["elapsed"]],
         data.table = t_dt[["elapsed"]], diagnostics = t_spy[["elapsed"]]), 3)
 #>        base       dplyr  data.table diagnostics 
-#>        0.31        0.31        0.32        0.31
+#>        0.39        0.38        0.48        0.67
 ```
 
 The three wrapper timings land close together, and the last entry shows

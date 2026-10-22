@@ -526,7 +526,6 @@ returns a string, both drop straight into expectations:
 ``` r
 
 library(testthat)
-#> Warning: package 'testthat' was built under R version 4.6.1
 
 test_that("orders join customers cleanly on customer_id", {
   expect_true(key_check(orders, customers, by = "customer_id", warn = FALSE))
@@ -591,9 +590,9 @@ report <- join_spy(sensors, readings, by = "sensor_id")
 # Text format -- human-readable
 txt_log <- tempfile(fileext = ".log")
 log_report(report, txt_log)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed9381f34691.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b70157f562b.log
 cat(readLines(txt_log), sep = "\n")
-#> Logged: 2026-10-19 17:43:39
+#> Logged: 2026-10-23 01:12:40
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -641,7 +640,7 @@ works on the raw file.
 # JSON format -- machine-readable
 json_log <- tempfile(fileext = ".json")
 log_report(report, json_log)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed9387b0f4f85.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7073243d94.json
 cat(readLines(json_log), sep = "\n")
 #> {
 #>   "by": "sensor_id",
@@ -673,7 +672,7 @@ cat(readLines(json_log), sep = "\n")
 #> },
 #>   "n_issues": 1,
 #>   "issue_types": "near_match",
-#>   "logged_at": "2026-10-19 17:43:39"
+#>   "logged_at": "2026-10-23 01:12:40"
 #> }
 unlink(json_log)
 ```
@@ -700,7 +699,7 @@ to the file.
 
 auto_log <- tempfile(fileext = ".log")
 set_log_file(auto_log, format = "text")
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed93817da5e2d.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b701c876cfb.log
 
 # These joins are automatically logged
 result1 <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
@@ -709,7 +708,7 @@ result2 <- inner_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 # Check what got logged
 cat(readLines(auto_log), sep = "\n")
 #> 
-#> Logged: 2026-10-19 17:43:39
+#> Logged: 2026-10-23 01:12:40
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -741,7 +740,7 @@ cat(readLines(auto_log), sep = "\n")
 #>   near_match: 1
 #> ============================================================
 #> 
-#> Logged: 2026-10-19 17:43:39
+#> Logged: 2026-10-23 01:12:40
 #> ------------------------------------------------------------
 #> Join Key: sensor_id
 #> 
@@ -790,7 +789,7 @@ configured:
 
 fn_log <- tempfile(fileext = ".log")
 previous <- set_log_file(fn_log)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed93846f249ae.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b703b0e298b.log
 
 result <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 
@@ -841,7 +840,7 @@ monitoring script:
 
 json_log <- tempfile(fileext = ".json")
 set_log_file(json_log, format = "json")
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed9383ffd4c18.json
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7054c770fd.json
 
 r1 <- left_join_spy(sensors, readings, by = "sensor_id", .quiet = TRUE)
 r2 <- inner_join_spy(orders, customers, by = "customer_id", .quiet = TRUE)
@@ -1014,13 +1013,13 @@ big_customers <- data.frame(
 # Full analysis
 system.time(report_full <- join_spy(big_orders, big_customers, by = "customer_id"))
 #>    user  system elapsed 
-#>    0.19    0.06    0.27
+#>    0.28    0.05    0.33
 
 # Sampled analysis
 system.time(report_sampled <- join_spy(big_orders, big_customers,
                                         by = "customer_id", sample = 5000))
 #>    user  system elapsed 
-#>    0.13    0.00    0.11
+#>    0.14    0.03    0.16
 ```
 
 The sampled report records its own provenance in `report$sampling` – the
@@ -1073,7 +1072,7 @@ enforcement, and logs everything.
 # --- Setup logging ---
 pipeline_log <- tempfile(fileext = ".log")
 set_log_file(pipeline_log, format = "text")
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkIrid\filed9384444469.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7021212bef.log
 
 # --- Load data (simulated) ---
 orders <- data.frame(
@@ -1146,7 +1145,7 @@ if (file.exists(pipeline_log)) {
   cat(readLines(pipeline_log), sep = "\n")
 }
 #> 
-#> Logged: 2026-10-19 17:43:39
+#> Logged: 2026-10-23 01:12:41
 #> ------------------------------------------------------------
 #> Join Key: customer_id
 #> 
@@ -1238,9 +1237,9 @@ t_check <- system.time(
 
 rbind(merge = t_merge, left_join_spy = t_spy, key_check = t_check)[, 1:3]
 #>               user.self sys.self elapsed
-#> merge              0.19     0.00    0.18
-#> left_join_spy      0.39     0.04    0.44
-#> key_check          0.03     0.00    0.01
+#> merge              0.32     0.00    0.36
+#> left_join_spy      0.78     0.13    0.94
+#> key_check          0.05     0.00    0.05
 ```
 
 The gap between [`merge()`](https://rdrr.io/r/base/merge.html) and

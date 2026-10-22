@@ -45,3 +45,6 @@ Rplots.pdf
 # CRAN submission file
 CRAN-SUBMISSION
 cookies.txt
+
+# Local run scripts
+.run*

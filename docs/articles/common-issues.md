@@ -1531,13 +1531,13 @@ debug a join that went wrong last Tuesday:
 
 log_file <- tempfile(fileext = ".log")
 set_log_file(log_file)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpAp4DL1\file179e4cd31ca7.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSGSqDd\filefc8c15a34438.log
 audited <- left_join_spy(shipments_repaired, invoices,
                          by = "order_ref", .quiet = TRUE)
 set_log_file(NULL)
 #> ℹ Automatic logging disabled
 readLines(log_file)[2:8]
-#> [1] "Logged: 2026-10-19 17:43:33"                                 
+#> [1] "Logged: 2026-10-23 01:12:33"                                 
 #> [2] "------------------------------------------------------------"
 #> [3] "Join Key: order_ref"                                         
 #> [4] ""                                                            

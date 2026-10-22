@@ -83,126 +83,148 @@
 <div class="page-header"><h1 id="joinspy">joinspy<a class="anchor" aria-label="anchor" href="#joinspy"></a>
 </h1></div>
 <p><em>keys that look identical but aren’t</em></p>
-<p><a href="https://CRAN.R-project.org/package=joinspy" class="external-link"><img src="https://www.r-pkg.org/badges/version/joinspy" alt="CRAN status"></a> <a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/joinspy" alt="CRAN downloads"></a> <a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/joinspy" alt="Monthly downloads"></a> <a href="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a> <a href="https://app.codecov.io/gh/gcol33/joinspy" class="external-link"><img src="https://codecov.io/gh/gcol33/joinspy/graph/badge.svg" alt="Codecov test coverage"></a> <a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></p>
-<p><strong>Diagnoses join keys at the character level before the join runs, then repairs them.</strong></p>
-<p>Most join failures come down to keys that look identical but aren’t: a trailing space, a stray uppercase letter, a zero-width Unicode character. R compares the raw bytes and reports a clean miss. <code><a href="reference/join_spy.html">join_spy()</a></code> inspects the key columns first, names the exact values that won’t match and why, predicts the result size for each join type, and hands you the code to fix them.</p>
+<!-- badges: start -->
+
+<p>joinspy checks the key columns of two tables before they are joined and reports the values that will not match, such as keys with a trailing space, a different case or an invisible Unicode character.</p>
+<p>R compares join keys byte by byte, so <code>"B "</code> and <code>"B"</code> are different keys and the join drops the row without a warning. The diagnostic report names each affected value, says why it fails to match and predicts the row count of every join type. You can then preview the repairs, apply them, or copy the generated code into your own script. joinspy supports:</p>
+<ul>
+<li>
+<strong>Repairing keys.</strong> <a href="https://gillescolling.com/joinspy/reference/join_repair.html"><code>join_repair()</code></a> trims whitespace, standardises case and removes invisible characters, with <code>dry_run = TRUE</code> to preview the changes. <code><a href="reference/suggest_repairs.html">suggest_repairs()</a></code> prints the same fixes as R code.</li>
+<li>
+<strong>Predicting the result size.</strong> The report gives the row count of the inner, left, right and full join from the key multiplicities, so a many-to-many key shows up before the join multiplies the rows.</li>
+<li>
+<strong>Declaring the relationship of the keys.</strong> <a href="https://gillescolling.com/joinspy/reference/join_strict.html"><code>join_strict()</code></a> joins only when the keys hold the declared relationship (<code>"1:1"</code>, <code>"1:n"</code>, <code>"n:1"</code> or <code>"n:m"</code>) and stops with an error otherwise.</li>
+<li>
+<strong>Explaining a join that already ran.</strong> <a href="https://gillescolling.com/joinspy/reference/join_explain.html"><code>join_explain()</code></a> compares the row count of a result with its two inputs and lists the keys that had no match.</li>
+<li>
+<strong>Three join engines.</strong> Tibbles are joined with <a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a>, data.tables with <a href="https://r-datatable.com" class="external-link">data.table</a> and plain data frames with base <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>, and the class of the input is kept through diagnosis, repair and join.</li>
+</ul>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"joinspy"</span><span class="op">)</span>            <span class="co"># CRAN</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span>                <span class="co"># development version</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"joinspy"</span><span class="op">)</span></span></code></pre></div>
+<p>Development version:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"gcol33/joinspy"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<ol style="list-style-type: decimal">
+<li>Check the keys of the two tables with <code><a href="reference/join_spy.html">join_spy()</a></code>.</li>
+<li>Fix whitespace, case and invisible characters with <code><a href="reference/join_repair.html">join_repair()</a></code>.</li>
+<li>Join the repaired tables with <code><a href="reference/left_join_spy.html">left_join_spy()</a></code> or one of the other wrappers, which run the same check and attach the report to the result.</li>
+</ol>
+<p><code><a href="reference/join_spy.html">join_spy()</a></code> takes two data frames, tibbles or data.tables and the key columns in <code>by</code>: the shared column names, or a named vector such as <code>c("id" = "customer_id")</code> when the names differ.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gillescolling.com/joinspy/">joinspy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># inspect the keys before joining</span></span>
-<span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># fix whitespace, case, and invisible characters</span></span>
-<span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="what-the-diagnostic-catches">What the diagnostic catches<a class="anchor" aria-label="anchor" href="#what-the-diagnostic-catches"></a>
-</h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  id     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B "</span>, <span class="st">"c"</span>, <span class="st">"D"</span><span class="op">)</span>,</span>
-<span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">200</span>, <span class="fl">300</span>, <span class="fl">400</span><span class="op">)</span>,</span>
-<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  amount <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">100</span>, <span class="fl">200</span>, <span class="fl">300</span>, <span class="fl">400</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span></span>
 <span><span class="va">customers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  id   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span>, <span class="st">"C"</span>, <span class="st">"E"</span><span class="op">)</span>,</span>
-<span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Alice"</span>, <span class="st">"Bob"</span>, <span class="st">"Carol"</span>, <span class="st">"Eve"</span><span class="op">)</span>,</span>
-<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Alice"</span>, <span class="st">"Bob"</span>, <span class="st">"Carol"</span>, <span class="st">"Eve"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span></span>
 <span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; -- Join Diagnostic Report --</span></span>
-<span><span class="co">#&gt; Match rate (left): 25%</span></span>
-<span><span class="co">#&gt;</span></span>
-<span><span class="co">#&gt; Issues Detected:</span></span>
-<span><span class="co">#&gt;   ! "B " has trailing whitespace (would match "B")</span></span>
-<span><span class="co">#&gt;   ! "c" vs "C" — case mismatch</span></span>
-<span><span class="co">#&gt;   x "D" has no match in right table</span></span></code></pre></div>
-<p>Each key column is checked for leading and trailing whitespace, case-only differences between the two tables, invisible Unicode (zero-width spaces, BOMs, non-breaking spaces), mixed encodings, empty strings that match each other but not <code>NA</code>, type and factor-level mismatches, floating-point keys that compare unequal, and near-matches within a Levenshtein distance of two for likely typos.</p>
-</div>
-<div class="section level2">
-<h2 id="repair">Repair<a class="anchor" aria-label="anchor" href="#repair"></a>
-</h2>
-<p><code><a href="reference/join_repair.html">join_repair()</a></code> applies the fixes; <code>dry_run = TRUE</code> previews them without touching the data, and <code><a href="reference/suggest_repairs.html">suggest_repairs()</a></code> prints the R code instead of running it, so you can paste it into a script you control.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">repaired</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>,</span>
-<span>                        standardize_case <span class="op">=</span> <span class="st">"upper"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="reference/suggest_repairs.html">suggest_repairs</a></span><span class="op">(</span><span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; x$id &lt;- trimws(x$id)</span></span>
-<span><span class="co">#&gt; x$id &lt;- toupper(x$id)</span></span>
-<span><span class="co">#&gt; y$id &lt;- toupper(y$id)</span></span></code></pre></div>
-</div>
-<div class="section level2">
-<h2 id="predicting-result-size">Predicting result size<a class="anchor" aria-label="anchor" href="#predicting-result-size"></a>
-</h2>
-<p>A report also estimates the row count for each join type from the key multiplicities, so a row explosion is visible before it happens:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span></span>
-<span><span class="va">report</span><span class="op">$</span><span class="va">expected_rows</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Join Diagnostic Report ──────────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; Join columns: id</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Table Summary ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table: Rows: 4 Unique keys: 4 Duplicate keys: 0 NA keys: 0</span></span>
+<span><span class="co">#&gt; Right table: Rows: 4 Unique keys: 4 Duplicate keys: 0 NA keys: 0</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Match Analysis ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keys in both: 1</span></span>
+<span><span class="co">#&gt; Keys only in left: 3</span></span>
+<span><span class="co">#&gt; Keys only in right: 3</span></span>
+<span><span class="co">#&gt; Match rate (left): "25%"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Issues Detected ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ! Left column 'id' has 1 value(s) with leading/trailing whitespace</span></span>
+<span><span class="co">#&gt; ! 1 key(s) would match if case-insensitive (e.g., 'c' vs 'C')</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Expected Row Counts ──</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; inner_join: 1</span></span>
-<span><span class="co">#&gt; left_join:  4</span></span>
+<span><span class="co">#&gt; left_join: 4</span></span>
 <span><span class="co">#&gt; right_join: 4</span></span>
-<span><span class="co">#&gt; full_join:  7</span></span></code></pre></div>
+<span><span class="co">#&gt; full_join: 7</span></span></code></pre></div>
+<p>Only <code>"A"</code> matches as written. <code>"B "</code> carries a trailing space and <code>"c"</code> differs from <code>"C"</code> in case, so each would match after a repair. <code>"D"</code> has no counterpart in <code>customers</code> and stays unmatched whatever is repaired.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fixed</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/join_repair.html">join_repair</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, standardize_case <span class="op">=</span> <span class="st">"upper"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; ✔ Repaired 2 value(s)</span></span>
+<span><span class="va">joined</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">fixed</span><span class="op">$</span><span class="va">x</span>, <span class="va">fixed</span><span class="op">$</span><span class="va">y</span>, by <span class="op">=</span> <span class="st">"id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">joined</span></span>
+<span><span class="co">#&gt;   id amount  name</span></span>
+<span><span class="co">#&gt; 1  A    100 Alice</span></span>
+<span><span class="co">#&gt; 2  B    200   Bob</span></span>
+<span><span class="co">#&gt; 3  C    300 Carol</span></span>
+<span><span class="co">#&gt; 4  D    400  &lt;NA&gt;</span></span></code></pre></div>
+<p>Three of the four orders now find their customer, and order <code>"D"</code> keeps an <code>NA</code> name. <code><a href="reference/last_report.html">last_report()</a></code> returns the report of the most recent join.</p>
 </div>
 <div class="section level2">
-<h2 id="enforcing-cardinality">Enforcing cardinality<a class="anchor" aria-label="anchor" href="#enforcing-cardinality"></a>
+<h2 id="what-the-report-checks">What the report checks<a class="anchor" aria-label="anchor" href="#what-the-report-checks"></a>
 </h2>
-<p><code><a href="reference/join_strict.html">join_strict()</a></code> performs the join and holds it to the relationship you declare. Declare <code>1:1</code> and it errors if any key is duplicated on either side, before producing a result. The output row count follows from the constraint rather than being discovered afterward.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># left keys must be unique, right may repeat</span></span>
-<span><span class="fu"><a href="reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">products</span>, <span class="va">line_items</span>, by <span class="op">=</span> <span class="st">"product_id"</span>, expect <span class="op">=</span> <span class="st">"1:n"</span><span class="op">)</span></span></code></pre></div>
-<p>The levels are <code>"1:1"</code>, <code>"1:n"</code>, <code>"n:1"</code>, and <code>"n:m"</code>. <code><a href="reference/detect_cardinality.html">detect_cardinality()</a></code> reports the actual relationship if you want to check first.</p>
+<p>Each key column is checked for:</p>
+<ul>
+<li>leading and trailing whitespace;</li>
+<li>values that differ between the two tables only in case;</li>
+<li>invisible Unicode characters (zero-width spaces, byte order marks, non-breaking spaces) and mixed encodings;</li>
+<li>empty strings, which match each other in a join while <code>NA</code> does not;</li>
+<li>type and factor-level mismatches between the two tables;</li>
+<li>floating-point keys that may not compare equal;</li>
+<li>near matches within a Levenshtein distance of two, which may be typos.</li>
+</ul>
+<p><a href="https://gillescolling.com/joinspy/articles/why-keys-dont-match.html">Why Your Keys Don’t Match</a> shows each case at the byte level, and <a href="https://gillescolling.com/joinspy/articles/common-issues.html">Common Join Problems</a> gives the fix for each.</p>
+</div>
+<div class="section level2">
+<h2 id="declaring-the-relationship-of-the-keys">Declaring the relationship of the keys<a class="anchor" aria-label="anchor" href="#declaring-the-relationship-of-the-keys"></a>
+</h2>
+<p>A join that should attach one customer to each order can multiply rows when a key repeats. <code><a href="reference/join_strict.html">join_strict()</a></code> takes the expected relationship and stops before joining when the data breaks it:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">items</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"A"</span>, <span class="st">"B"</span><span class="op">)</span>, qty <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">1</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/join_strict.html">join_strict</a></span><span class="op">(</span><span class="va">customers</span>, <span class="va">items</span>, by <span class="op">=</span> <span class="st">"id"</span>, expect <span class="op">=</span> <span class="st">"1:1"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Error in `join_strict()`:</span></span>
+<span><span class="co">#&gt; ! Cardinality violation: expected "1:1" but found "1:n".</span></span>
+<span><span class="co">#&gt; ℹ Left duplicates: 0, right duplicates: 1.</span></span></code></pre></div>
+<p><code><a href="reference/detect_cardinality.html">detect_cardinality()</a></code> reports the relationship the keys actually have. <a href="https://gillescolling.com/joinspy/articles/production.html">Joins in Production</a> uses these checks as gates in a pipeline, with logged reports.</p>
 </div>
 <div class="section level2">
 <h2 id="explaining-a-join-that-already-ran">Explaining a join that already ran<a class="anchor" aria-label="anchor" href="#explaining-a-join-that-already-ran"></a>
 </h2>
-<p><code><a href="reference/join_explain.html">join_explain()</a></code> works on the result, accounting for the row count against the two inputs:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<p><code><a href="reference/join_explain.html">join_explain()</a></code> takes a result and the two tables it came from, and accounts for its row count:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, all.x <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/join_explain.html">join_explain</a></span><span class="op">(</span><span class="va">result</span>, <span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"id"</span>, type <span class="op">=</span> <span class="st">"left"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Result has same row count as left table</span></span>
-<span><span class="co">#&gt; ! 3 left key(s) have no match in right table</span></span></code></pre></div>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Join Explanation ────────────────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Row Counts ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Left table (x): 4 rows</span></span>
+<span><span class="co">#&gt; Right table (y): 4 rows</span></span>
+<span><span class="co">#&gt; Result: 4 rows</span></span>
+<span><span class="co">#&gt; ✔ Result has same row count as left table</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── Why the row count changed ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ℹ 3 left key(s) have no match in right table</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="drop-in-join-wrappers">Drop-in join wrappers<a class="anchor" aria-label="anchor" href="#drop-in-join-wrappers"></a>
-</h2>
-<p><code><a href="reference/left_join_spy.html">left_join_spy()</a></code>, <code><a href="reference/inner_join_spy.html">inner_join_spy()</a></code>, and the rest run the diagnostic, perform the join, and attach the report as an attribute. <code><a href="reference/check_cartesian.html">check_cartesian()</a></code> flags many-to-many keys that would multiply the row count, and <code><a href="reference/analyze_join_chain.html">analyze_join_chain()</a></code> traces a multi-step A-B-C sequence. Inputs dispatch to their native engine: tibbles use dplyr, data.tables use data.table, plain data frames use base <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>, and the class survives the diagnose-repair-join cycle.</p>
-</div>
-<div class="section level2">
-<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
-</h2>
-<ul>
-<li><a href="https://gillescolling.com/joinspy/articles/quickstart.html">Getting Started</a></li>
-<li><a href="https://gillescolling.com/joinspy/articles/why-keys-dont-match.html">Why Your Keys Don’t Match</a></li>
-<li><a href="https://gillescolling.com/joinspy/articles/common-issues.html">Common Join Issues</a></li>
-<li><a href="https://gillescolling.com/joinspy/articles/production.html">Joins in Production</a></li>
-<li><a href="https://gillescolling.com/joinspy/articles/backends.html">Working with Backends</a></li>
-<li><a href="https://gillescolling.com/joinspy/reference/index.html">Function Reference</a></li>
-</ul>
-</div>
-<div class="section level2">
-<h2 id="related-work">Related work<a class="anchor" aria-label="anchor" href="#related-work"></a>
+<h2 id="related-packages">Related packages<a class="anchor" aria-label="anchor" href="#related-packages"></a>
 </h2>
 <table class="table">
 <colgroup>
-<col width="56%">
-<col width="43%">
+<col width="50%">
+<col width="50%">
 </colgroup>
 <thead><tr>
 <th>Package</th>
@@ -212,7 +234,7 @@
 <tr>
 <td>
 <a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a> 1.1+</td>
-<td>Cardinality checks via <code>relationship</code> argument</td>
+<td>Cardinality checks via the <code>relationship</code> argument</td>
 </tr>
 <tr>
 <td><a href="https://github.com/moodymudskipper/powerjoin" class="external-link">powerjoin</a></td>
@@ -228,7 +250,34 @@
 </tr>
 </tbody>
 </table>
-<p><code>joinspy</code> works on the keys themselves: whitespace, case, encoding, typos, and type mismatches. It points to the specific values that failed, says why, and can fix them.</p>
+<p>joinspy works on the key values themselves: it names the values that fail to match, gives the reason and can repair them.</p>
+</div>
+<div class="section level2">
+<h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
+</h2>
+<p>Start with the <a href="https://gillescolling.com/joinspy/articles/quickstart.html">Quick Start</a>: every feature on small examples, from the first diagnosis to logging.</p>
+<ul>
+<li>
+<a href="https://gillescolling.com/joinspy/articles/why-keys-dont-match.html">Why Your Keys Don’t Match</a>: whitespace, case, encoding and typos at the byte level.</li>
+<li>
+<a href="https://gillescolling.com/joinspy/articles/common-issues.html">Common Join Problems</a>: each problem with its diagnosis and fix.</li>
+<li>
+<a href="https://gillescolling.com/joinspy/articles/production.html">Joins in Production</a>: key assertions, cardinality guards, tests and logging in pipelines.</li>
+<li>
+<a href="https://gillescolling.com/joinspy/articles/backends.html">Working with Backends</a>: how base R, dplyr and data.table are chosen and where they differ.</li>
+<li>
+<a href="https://gillescolling.com/joinspy/reference/">Full reference</a>: every function, grouped by job.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="getting-help">Getting help<a class="anchor" aria-label="anchor" href="#getting-help"></a>
+</h2>
+<p>Questions and bug reports go to the <a href="https://github.com/gcol33/joinspy/issues" class="external-link">GitHub issues</a>. A bug report is easiest to act on with a small reproducible example, for instance made with <a href="https://reprex.tidyverse.org/" class="external-link">reprex</a>.</p>
+</div>
+<div class="section level2">
+<h2 id="contributing">Contributing<a class="anchor" aria-label="anchor" href="#contributing"></a>
+</h2>
+<p>Pull requests are welcome; see the <a href="https://gillescolling.com/joinspy/CONTRIBUTING.html">contributing guide</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="support">Support<a class="anchor" aria-label="anchor" href="#support"></a>
@@ -237,23 +286,31 @@
 <p>“Software is like sex: it’s better when it’s free.” — Linus Torvalds</p>
 </blockquote>
 <p>I’m a PhD student who builds R packages in my free time because I believe good tools should be free and open. I started these projects for my own work and figured others might find them useful too.</p>
-<p>If this package saved you some time, buying me a coffee is a nice way to say thanks.</p>
+<p>If this package saved you some time, buying me a coffee is a nice way to say thanks. It helps with my coffee addiction.</p>
 <p><a href="https://buymeacoffee.com/gcol33" class="external-link"><img src="https://img.shields.io/badge/-Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&amp;logoColor=black" alt="Buy Me A Coffee"></a></p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<p>MIT (see the LICENSE.md file)</p>
+<p>joinspy is licensed under MIT.</p>
 </div>
 <div class="section level2">
 <h2 id="citation">Citation<a class="anchor" aria-label="anchor" href="#citation"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co">@software{joinspy,</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="co">  author = {Colling, Gilles},</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">  title = {joinspy: Diagnostic Tools for Data Frame Joins},</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">  year = {2025},</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">  url = {https://github.com/gcol33/joinspy}</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">}</span></span></code></pre></div>
+<pre class="text"><code>Colling G (2026). _joinspy: Diagnostic Tools for Data Frame Joins_.
+doi:10.32614/CRAN.package.joinspy
+&lt;https://doi.org/10.32614/CRAN.package.joinspy&gt;. R package version
+0.8.3, &lt;https://gillescolling.com/joinspy/&gt;.</code></pre>
+<p>BibTeX:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bibtex"><code class="sourceCode bibtex"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="va">@Manual</span>{<span class="ot">colling2026joinspy</span>,</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="dt">title</span> = {joinspy: Diagnostic Tools for Data Frame Joins},</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="dt">author</span> = {Gilles Colling},</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="dt">year</span> = {2026},</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>  <span class="dt">note</span> = {R package version 0.8.3},</span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  <span class="dt">doi</span> = {10.32614/CRAN.package.joinspy},</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  <span class="dt">url</span> = {https://gillescolling.com/joinspy/},</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>}</span></code></pre></div>
+<p>Download the citation as <a href="https://gillescolling.com/joinspy/joinspy.bib">BibTeX</a> or <a href="https://gillescolling.com/joinspy/joinspy.ris">RIS</a>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -295,7 +352,15 @@
 </ul>
 </div>
 
-
+<div class="dev-status">
+<h2 data-toc-skip>Dev status</h2>
+<ul class="list-unstyled">
+<li><a href="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/gcol33/joinspy/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
+<li><a href="https://app.codecov.io/gh/gcol33/joinspy" class="external-link"><img src="https://codecov.io/gh/gcol33/joinspy/graph/badge.svg" alt="Codecov test coverage"></a></li>
+<li><a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></li>
+<li><a href="https://CRAN.R-project.org/package=joinspy" class="external-link"><img src="https://www.r-pkg.org/badges/version/joinspy" alt="CRAN status"></a></li>
+</ul>
+</div>
 
   </aside>
 </div>
