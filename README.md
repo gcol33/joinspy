@@ -12,6 +12,10 @@ coverage](https://codecov.io/gh/gcol33/joinspy/graph/badge.svg)](https://app.cod
 MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CRAN
 status](https://www.r-pkg.org/badges/version/joinspy)](https://CRAN.R-project.org/package=joinspy)
+[![CRAN
+downloads](https://cranlogs.r-pkg.org/badges/grand-total/joinspy)](https://cran.r-project.org/package=joinspy)
+[![Monthly
+downloads](https://cranlogs.r-pkg.org/badges/joinspy)](https://cran.r-project.org/package=joinspy)
 <!-- badges: end -->
 
 joinspy checks the key columns of two tables before they are joined and
