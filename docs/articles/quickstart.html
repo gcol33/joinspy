@@ -309,7 +309,7 @@ instead of producing a silently wrong result.</p>
 orders table calls it <code>id</code>, the CRM calls it
 <code>customer_id</code>. Renaming a column just to run a diagnostic is
 busywork, so every joinspy function that takes <code>by</code> also
-accepts the named-vector form familiar from dplyr:</p>
+accepts the named-vector form that dplyr uses:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sales_reps</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"C1"</span>, <span class="st">"C2"</span>, <span class="st">"C3"</span><span class="op">)</span>,</span>
@@ -1651,7 +1651,7 @@ object.</p>
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">patients</span>, <span class="va">labs</span>, by <span class="op">=</span> <span class="st">"patient_id"</span><span class="op">)</span></span>
 <span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">tmp</span>, timestamp <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102085a6c2f0b.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84542549d.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Join Key: patient_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -1669,7 +1669,7 @@ as structured fields:</p>
 <div class="sourceCode" id="cb50"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tmp_json</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">tmp_json</span>, timestamp <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102087d3c580e.json</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac842b16320b.json</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">tmp_json</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; {</span></span>
 <span><span class="co">#&gt;   "by": "patient_id",</span></span>
@@ -1693,7 +1693,7 @@ currently configured path, or <code>NULL</code> when logging is off.</p>
 <div class="sourceCode" id="cb51"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">log_path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">log_path</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102082bdcd29.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84101e1e5f.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_log_file.html">get_log_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="va">log_path</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">

@@ -238,7 +238,7 @@ site instead of producing a silently wrong result.
 Often the key columns carry different names in the two tables: the
 orders table calls it `id`, the CRM calls it `customer_id`. Renaming a
 column just to run a diagnostic is busywork, so every joinspy function
-that takes `by` also accepts the named-vector form familiar from dplyr:
+that takes `by` also accepts the named-vector form that dplyr uses:
 
 ``` r
 
@@ -1684,7 +1684,7 @@ machine-readable output, and `.rds` for the complete R object.
 report <- join_spy(patients, labs, by = "patient_id")
 tmp <- tempfile(fileext = ".log")
 log_report(report, tmp, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102085a6c2f0b.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84542549d.log
 cat(readLines(tmp)[1:8], sep = "\n")
 #> Join Key: patient_id
 #> 
@@ -1705,7 +1705,7 @@ history. The JSON format carries the same numbers as structured fields:
 
 tmp_json <- tempfile(fileext = ".json")
 log_report(report, tmp_json, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102087d3c580e.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac842b16320b.json
 cat(readLines(tmp_json)[1:8], sep = "\n")
 #> {
 #>   "by": "patient_id",
@@ -1739,7 +1739,7 @@ returns the currently configured path, or `NULL` when logging is off.
 
 log_path <- tempfile(fileext = ".log")
 set_log_file(log_path)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpAZD2Nz\file102082bdcd29.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84101e1e5f.log
 identical(get_log_file(), log_path)
 #> [1] TRUE
 ```

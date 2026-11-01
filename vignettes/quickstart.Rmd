@@ -103,7 +103,7 @@ Because the return value is a plain logical, it slots into `stopifnot()` or cond
 
 ### Keys with Different Names
 
-Often the key columns carry different names in the two tables: the orders table calls it `id`, the CRM calls it `customer_id`. Renaming a column just to run a diagnostic is busywork, so every joinspy function that takes `by` also accepts the named-vector form familiar from dplyr:
+Often the key columns carry different names in the two tables: the orders table calls it `id`, the CRM calls it `customer_id`. Renaming a column just to run a diagnostic is busywork, so every joinspy function that takes `by` also accepts the named-vector form that dplyr uses:
 
 ```{r}
 sales_reps <- data.frame(
