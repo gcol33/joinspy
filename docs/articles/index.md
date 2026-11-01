@@ -1,18 +1,18 @@
 # Articles
 
-### Getting Started
+### Get started
 
 - [Quick
   Start](https://gillescolling.com/joinspy/articles/quickstart.md):
 
-### Key Diagnostics
+### Key diagnostics
 
 - [Why Your Keys Don't
   Match](https://gillescolling.com/joinspy/articles/why-keys-dont-match.md):
 - [Common Join
   Problems](https://gillescolling.com/joinspy/articles/common-issues.md):
 
-### Usage Guides
+### Usage guides
 
 - [Joins in
   Production](https://gillescolling.com/joinspy/articles/production.md):

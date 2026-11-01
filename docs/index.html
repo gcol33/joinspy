@@ -46,15 +46,21 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="articles/quickstart.html">Get Started</a></li>
+<li class="nav-item"><a class="nav-link" href="articles/quickstart.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Key diagnostics</h6></li>
+    <li><a class="dropdown-item" href="articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="articles/common-issues.html">Common Join Problems</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Usage guides</h6></li>
     <li><a class="dropdown-item" href="articles/production.html">Joins in Production</a></li>
     <li><a class="dropdown-item" href="articles/backends.html">Working with Backends</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -63,6 +69,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json">
 </form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/gcol33/joinspy" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-lightswitch" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true" aria-label="Light switch"><span class="fa fa-sun"></span></button>
   <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown-lightswitch">
@@ -71,7 +78,6 @@
     <li><button class="dropdown-item" data-bs-theme-value="auto"><span class="fa fa-adjust"></span> Auto</button></li>
   </ul>
 </li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/gcol33/joinspy" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -86,7 +92,7 @@
 <!-- badges: start -->
 
 <p>joinspy checks the key columns of two tables before they are joined and reports the values that will not match, such as keys with a trailing space, a different case or an invisible Unicode character.</p>
-<p>R compares join keys byte by byte, so <code>"B "</code> and <code>"B"</code> are different keys and the join drops the row without a warning. The diagnostic report names each affected value, says why it fails to match and predicts the row count of every join type. You can then preview the repairs, apply them, or copy the generated code into your own script. joinspy supports:</p>
+<p>R compares join keys byte by byte, so a key with a trailing space never matches its trimmed counterpart and the join drops the row without a warning. The diagnostic report names each affected value, says why it fails to match and predicts the row count of every join type. You can then preview the repairs, apply them, or copy the generated code into your own script. joinspy supports:</p>
 <ul>
 <li>
 <strong>Repairing keys.</strong> <a href="https://gillescolling.com/joinspy/reference/join_repair.html"><code>join_repair()</code></a> trims whitespace, standardises case and removes invisible characters, with <code>dry_run = TRUE</code> to preview the changes. <code><a href="reference/suggest_repairs.html">suggest_repairs()</a></code> prints the same fixes as R code.</li>
@@ -232,9 +238,8 @@
 </tr></thead>
 <tbody>
 <tr>
-<td>
-<a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a> 1.1+</td>
-<td>Cardinality checks via the <code>relationship</code> argument</td>
+<td><a href="https://dplyr.tidyverse.org/" class="external-link">dplyr</a></td>
+<td>Cardinality checks via the <code>relationship</code> argument of its join functions</td>
 </tr>
 <tr>
 <td><a href="https://github.com/moodymudskipper/powerjoin" class="external-link">powerjoin</a></td>
@@ -359,6 +364,8 @@ doi:10.32614/CRAN.package.joinspy
 <li><a href="https://app.codecov.io/gh/gcol33/joinspy" class="external-link"><img src="https://codecov.io/gh/gcol33/joinspy/graph/badge.svg" alt="Codecov test coverage"></a></li>
 <li><a href="https://opensource.org/licenses/MIT" class="external-link"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a></li>
 <li><a href="https://CRAN.R-project.org/package=joinspy" class="external-link"><img src="https://www.r-pkg.org/badges/version/joinspy" alt="CRAN status"></a></li>
+<li><a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/grand-total/joinspy" alt="CRAN downloads"></a></li>
+<li><a href="https://cran.r-project.org/package=joinspy" class="external-link"><img src="https://cranlogs.r-pkg.org/badges/joinspy" alt="Monthly downloads"></a></li>
 </ul>
 </div>
 

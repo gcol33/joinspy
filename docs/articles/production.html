@@ -44,15 +44,21 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get Started</a></li>
+<li class="nav-item"><a class="nav-link" href="../articles/quickstart.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
+<li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Key diagnostics</h6></li>
+    <li><a class="dropdown-item" href="../articles/why-keys-dont-match.html">Why Your Keys Don't Match</a></li>
     <li><a class="dropdown-item" href="../articles/common-issues.html">Common Join Problems</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Usage guides</h6></li>
     <li><a class="dropdown-item" href="../articles/production.html">Joins in Production</a></li>
     <li><a class="dropdown-item" href="../articles/backends.html">Working with Backends</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><a class="dropdown-item" href="../articles/index.html">More articles...</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -61,6 +67,7 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/gcol33/joinspy" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-lightswitch" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true" aria-label="Light switch"><span class="fa fa-sun"></span></button>
   <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdown-lightswitch">
@@ -69,7 +76,6 @@
     <li><button class="dropdown-item" data-bs-theme-value="auto"><span class="fa fa-adjust"></span> Auto</button></li>
   </ul>
 </li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/gcol33/joinspy" aria-label="GitHub"><span class="fa fab fa-github"></span></a></li>
       </ul>
 </div>
 
@@ -87,7 +93,7 @@
                         <h4 data-toc-skip class="author">Gilles
 Colling</h4>
             
-            <h4 data-toc-skip class="date">2026-10-23</h4>
+            <h4 data-toc-skip class="date">2026-11-01</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/gcol33/joinspy/blob/HEAD/vignettes/production.Rmd" class="external-link"><code>vignettes/production.Rmd</code></a></small>
       <div class="d-none name"><code>production.Rmd</code></div>
@@ -580,9 +586,9 @@ R object.</p>
 <span><span class="co"># Text format -- human-readable</span></span>
 <span><span class="va">txt_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">txt_log</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b70157f562b.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea98412cd47d0.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">txt_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Logged: 2026-10-23 01:12:40</span></span>
+<span><span class="co">#&gt; Logged: 2026-11-01 16:55:39</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -625,7 +631,7 @@ works on the raw file.</p>
 <code class="sourceCode R"><span><span class="co"># JSON format -- machine-readable</span></span>
 <span><span class="va">json_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">json_log</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7073243d94.json</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea9843e583cd9.json</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; {</span></span>
 <span><span class="co">#&gt;   "by": "sensor_id",</span></span>
@@ -657,7 +663,7 @@ works on the raw file.</p>
 <span><span class="co">#&gt; },</span></span>
 <span><span class="co">#&gt;   "n_issues": 1,</span></span>
 <span><span class="co">#&gt;   "issue_types": "near_match",</span></span>
-<span><span class="co">#&gt;   "logged_at": "2026-10-23 01:12:40"</span></span>
+<span><span class="co">#&gt;   "logged_at": "2026-11-01 16:55:39"</span></span>
 <span><span class="co">#&gt; }</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">json_log</span><span class="op">)</span></span></code></pre></div>
 <p>Text format works for tailing logs during a batch run; JSON format
@@ -679,7 +685,7 @@ file.</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">auto_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">auto_log</span>, format <span class="op">=</span> <span class="st">"text"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b701c876cfb.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea98412864490.log</span></span></span>
 <span></span>
 <span><span class="co"># These joins are automatically logged</span></span>
 <span><span class="va">result1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -688,7 +694,7 @@ file.</p>
 <span><span class="co"># Check what got logged</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">auto_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-10-23 01:12:40</span></span>
+<span><span class="co">#&gt; Logged: 2026-11-01 16:55:39</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -720,7 +726,7 @@ file.</p>
 <span><span class="co">#&gt;   near_match: 1</span></span>
 <span><span class="co">#&gt; ============================================================</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-10-23 01:12:40</span></span>
+<span><span class="co">#&gt; Logged: 2026-11-01 16:55:39</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: sensor_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -764,7 +770,7 @@ joins and then put back whatever the caller had configured:</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fn_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="va">previous</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">fn_log</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b703b0e298b.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea9845f1886a.log</span></span></span>
 <span></span>
 <span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span></span>
@@ -806,7 +812,7 @@ monitoring script:</p>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">json_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">json_log</span>, format <span class="op">=</span> <span class="st">"json"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7054c770fd.json</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea98417cb6465.json</span></span></span>
 <span></span>
 <span><span class="va">r1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/left_join_spy.html">left_join_spy</a></span><span class="op">(</span><span class="va">sensors</span>, <span class="va">readings</span>, by <span class="op">=</span> <span class="st">"sensor_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">r2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/inner_join_spy.html">inner_join_spy</a></span><span class="op">(</span><span class="va">orders</span>, <span class="va">customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span>, .quiet <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -950,13 +956,13 @@ analysis on a random subset while the actual join (via a
 <span><span class="co"># Full analysis</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">report_full</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>, by <span class="op">=</span> <span class="st">"customer_id"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    user  system elapsed </span></span>
-<span><span class="co">#&gt;    0.28    0.05    0.33</span></span>
+<span><span class="co">#&gt;    0.22    0.02    0.27</span></span>
 <span></span>
 <span><span class="co"># Sampled analysis</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/system.time.html" class="external-link">system.time</a></span><span class="op">(</span><span class="va">report_sampled</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">big_orders</span>, <span class="va">big_customers</span>,</span>
 <span>                                        by <span class="op">=</span> <span class="st">"customer_id"</span>, sample <span class="op">=</span> <span class="fl">5000</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;    user  system elapsed </span></span>
-<span><span class="co">#&gt;    0.14    0.03    0.16</span></span></code></pre></div>
+<span><span class="co">#&gt;    0.13    0.00    0.12</span></span></code></pre></div>
 <p>The sampled report records its own provenance in
 <code>report$sampling</code> – the sample size and the original row
 counts – and the printed report flags it, so a log reader can tell
@@ -1002,7 +1008,7 @@ cardinality enforcement, and logs everything.</p>
 <span><span class="co"># --- Setup logging ---</span></span>
 <span><span class="va">pipeline_log</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">pipeline_log</span>, format <span class="op">=</span> <span class="st">"text"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpusuaFq\file10b7021212bef.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpUvY1UW\filea98476e56e21.log</span></span></span>
 <span></span>
 <span><span class="co"># --- Load data (simulated) ---</span></span>
 <span><span class="va">orders</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -1075,7 +1081,7 @@ cardinality enforcement, and logs everything.</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">pipeline_log</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Logged: 2026-10-23 01:12:41</span></span>
+<span><span class="co">#&gt; Logged: 2026-11-01 16:55:39</span></span>
 <span><span class="co">#&gt; ------------------------------------------------------------</span></span>
 <span><span class="co">#&gt; Join Key: customer_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -1161,9 +1167,9 @@ gate on the tables from the sampling section:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind</a></span><span class="op">(</span>merge <span class="op">=</span> <span class="va">t_merge</span>, left_join_spy <span class="op">=</span> <span class="va">t_spy</span>, key_check <span class="op">=</span> <span class="va">t_check</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">]</span></span>
 <span><span class="co">#&gt;               user.self sys.self elapsed</span></span>
-<span><span class="co">#&gt; merge              0.32     0.00    0.36</span></span>
-<span><span class="co">#&gt; left_join_spy      0.78     0.13    0.94</span></span>
-<span><span class="co">#&gt; key_check          0.05     0.00    0.05</span></span></code></pre></div>
+<span><span class="co">#&gt; merge              0.19     0.00    0.19</span></span>
+<span><span class="co">#&gt; left_join_spy      0.40     0.01    0.44</span></span>
+<span><span class="co">#&gt; key_check          0.02     0.00    0.03</span></span></code></pre></div>
 <p>The gap between <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and <code><a href="../reference/left_join_spy.html">left_join_spy()</a></code>
 is the full diagnostic: key summaries, match analysis, row-count
 prediction, and the string scans. The scans are vectorized, and the one

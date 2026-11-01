@@ -32,23 +32,12 @@ navbar:
     - news
     right:
     - search
-    - lightswitch
     - github
+    - lightswitch
   components:
     intro:
-      text: Get Started
+      text: Get started
       href: articles/quickstart.html
-    articles:
-      text: Articles
-      menu:
-      - text: Why Your Keys Don't Match
-        href: articles/why-keys-dont-match.html
-      - text: Common Join Problems
-        href: articles/common-issues.html
-      - text: Joins in Production
-        href: articles/production.html
-      - text: Working with Backends
-        href: articles/backends.html
     github:
       icon: fab fa-github
       href: https://github.com/gcol33/joinspy
@@ -100,16 +89,16 @@ reference:
 - title: Helpers
   contents: is_join_report
 articles:
-- title: Getting Started
-  navbar: ~
-  contents: quickstart
-- title: Key Diagnostics
-  navbar: ~
+- title: Get started
+  contents:
+  - quickstart
+- title: Key diagnostics
+  navbar: Key diagnostics
   contents:
   - why-keys-dont-match
   - common-issues
-- title: Usage Guides
-  navbar: ~
+- title: Usage guides
+  navbar: Usage guides
   contents:
   - production
   - backends
