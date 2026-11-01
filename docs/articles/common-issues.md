@@ -1531,13 +1531,13 @@ debug a join that went wrong last Tuesday:
 
 log_file <- tempfile(fileext = ".log")
 set_log_file(log_file)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpSkcnQX\fileae38454614bd.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpAVRSJY\filebb382d4638a4.log
 audited <- left_join_spy(shipments_repaired, invoices,
                          by = "order_ref", .quiet = TRUE)
 set_log_file(NULL)
 #> ℹ Automatic logging disabled
 readLines(log_file)[2:8]
-#> [1] "Logged: 2026-11-01 18:02:31"                                 
+#> [1] "Logged: 2026-11-02 00:24:49"                                 
 #> [2] "------------------------------------------------------------"
 #> [3] "Join Key: order_ref"                                         
 #> [4] ""                                                            
@@ -1602,7 +1602,7 @@ five-table pipeline is visible without bisecting by hand.
 
 ## See Also
 
-- [`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md)
+- [`vignette("joinspy")`](https://gillescolling.com/joinspy/articles/joinspy.md)
   for a quick introduction to joinspy
 
 - [`?join_spy`](https://gillescolling.com/joinspy/reference/join_spy.md),

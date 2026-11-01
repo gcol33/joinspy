@@ -649,7 +649,7 @@ recommendation for everything except the deliberate cases above.
 
 ## See Also
 
-- `vignette("quickstart")` for a quick introduction to joinspy
+- `vignette("joinspy")` for a quick introduction to joinspy
 
 - `vignette("common-issues")` for a catalogue of join problems and solutions
 

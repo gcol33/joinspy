@@ -1,10 +1,5 @@
 # Articles
 
-### Get started
-
-- [Quick
-  Start](https://gillescolling.com/joinspy/articles/quickstart.md):
-
 ### Key diagnostics
 
 - [Why Your Keys Don't

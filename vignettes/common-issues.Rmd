@@ -897,7 +897,7 @@ pipeline is visible without bisecting by hand.
 
 ## See Also
 
-- `vignette("quickstart")` for a quick introduction to joinspy
+- `vignette("joinspy")` for a quick introduction to joinspy
 
 - `?join_spy`, `?join_repair`, `?key_check`, `?join_strict`
 

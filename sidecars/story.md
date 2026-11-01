@@ -45,7 +45,7 @@ R users who join tables from different sources (exports, databases, spreadsheets
 ## Documents
 - DESCRIPTION: claim, A1, A3
 - README / landing: claim, first diagnosis and repair, one section per A1 and A3, routing
-- Quick Start (quickstart.Rmd): tour of every feature
+- Quick Start (joinspy.Rmd): tour of every feature
 - why-keys-dont-match.Rmd: explanation, A1
 - common-issues.Rmd: how-to per problem, A2
 - production.Rmd: how-to, A3 in pipelines

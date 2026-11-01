@@ -122,7 +122,7 @@ joinspy works on the key values themselves: it names the values that fail to mat
 
 ## Documentation
 
-Start with the [Quick Start](https://gillescolling.com/joinspy/articles/quickstart.html): every feature on small examples, from the first diagnosis to logging.
+Start with the [Quick Start](https://gillescolling.com/joinspy/articles/joinspy.html): every feature on small examples, from the first diagnosis to logging.
 
 - [Why Your Keys Don't Match](https://gillescolling.com/joinspy/articles/why-keys-dont-match.html): whitespace, case, encoding and typos at the byte level.
 - [Common Join Problems](https://gillescolling.com/joinspy/articles/common-issues.html): each problem with its diagnosis and fix.

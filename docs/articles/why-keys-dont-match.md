@@ -994,7 +994,7 @@ For the wider catalogue of join failures beyond strings (duplicate keys
 multiplying rows, NA keys, accidental cartesian products), see
 [`vignette("common-issues")`](https://gillescolling.com/joinspy/articles/common-issues.md).
 For a tour of the full API on one worked example, see
-[`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md).
+[`vignette("joinspy")`](https://gillescolling.com/joinspy/articles/joinspy.md).
 The string-level defects collected here are the ones that resist
 inspection longest; one diagnostic call before joining data you did not
 generate yourself covers every one of them.

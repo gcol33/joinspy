@@ -743,7 +743,7 @@ t_spy <- system.time(report <- join_spy(big_x, big_y, by = "id"))
 round(c(base = t_base[["elapsed"]], dplyr = t_dplyr[["elapsed"]],
         data.table = t_dt[["elapsed"]], diagnostics = t_spy[["elapsed"]]), 3)
 #>        base       dplyr  data.table diagnostics 
-#>        0.33        0.29        0.33        0.30
+#>        0.36        0.34        0.32        0.35
 ```
 
 The three wrapper timings land close together, and the last entry shows
@@ -786,7 +786,7 @@ deliberate cases above.
 
 ## See Also
 
-- [`vignette("quickstart")`](https://gillescolling.com/joinspy/articles/quickstart.md)
+- [`vignette("joinspy")`](https://gillescolling.com/joinspy/articles/joinspy.md)
   for a quick introduction to joinspy
 
 - [`vignette("common-issues")`](https://gillescolling.com/joinspy/articles/common-issues.md)

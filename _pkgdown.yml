@@ -35,9 +35,6 @@ navbar:
     - github
     - lightswitch
   components:
-    intro:
-      text: Get started
-      href: articles/quickstart.html
     github:
       icon: fab fa-github
       href: https://github.com/gcol33/joinspy
@@ -89,9 +86,6 @@ reference:
 - title: Helpers
   contents: is_join_report
 articles:
-- title: Get started
-  contents:
-  - quickstart
 - title: Key diagnostics
   navbar: Key diagnostics
   contents:
@@ -102,3 +96,5 @@ articles:
   contents:
   - production
   - backends
+redirects:
+- ["articles/quickstart.html", "articles/joinspy.html"]

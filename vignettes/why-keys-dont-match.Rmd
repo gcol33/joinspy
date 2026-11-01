@@ -714,6 +714,6 @@ pointing at it.
 For the wider catalogue of join failures beyond strings (duplicate keys
 multiplying rows, NA keys, accidental cartesian products), see
 `vignette("common-issues")`. For a tour of the full API on one worked
-example, see `vignette("quickstart")`. The string-level defects collected
+example, see `vignette("joinspy")`. The string-level defects collected
 here are the ones that resist inspection longest; one diagnostic call before
 joining data you did not generate yourself covers every one of them.

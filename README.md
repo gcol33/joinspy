@@ -214,7 +214,7 @@ fail to match, gives the reason and can repair them.
 ## Documentation
 
 Start with the [Quick
-Start](https://gillescolling.com/joinspy/articles/quickstart.html):
+Start](https://gillescolling.com/joinspy/articles/joinspy.html):
 every feature on small examples, from the first diagnosis to logging.
 
 - [Why Your Keys Don’t

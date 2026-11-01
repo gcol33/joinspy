@@ -761,7 +761,7 @@ key counts in the three regions and the match rate in the subtitle:
 plot(report)
 ```
 
-![](quickstart_files/figure-html/unnamed-chunk-19-1.svg)
+![](joinspy_files/figure-html/unnamed-chunk-19-1.svg)
 
 The picture makes the diagnosis immediate: two keys live only in `sales`
 (the damaged Paris and Berlin), two are shared, and three live only in
@@ -1683,7 +1683,7 @@ machine-readable output, and `.rds` for the complete R object.
 report <- join_spy(patients, labs, by = "patient_id")
 tmp <- tempfile(fileext = ".log")
 log_report(report, tmp, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef3841cc865ce.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpmqJtGY\filef720620b4ecf.log
 cat(readLines(tmp)[1:8], sep = "\n")
 #> Join Key: patient_id
 #> 
@@ -1704,7 +1704,7 @@ history. The JSON format carries the same numbers as structured fields:
 
 tmp_json <- tempfile(fileext = ".json")
 log_report(report, tmp_json, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38417ce78c.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpmqJtGY\filef7203f624233.json
 cat(readLines(tmp_json)[1:8], sep = "\n")
 #> {
 #>   "by": "patient_id",
@@ -1738,7 +1738,7 @@ returns the currently configured path, or `NULL` when logging is off.
 
 log_path <- tempfile(fileext = ".log")
 set_log_file(log_path)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38453273e1d.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpmqJtGY\filef720651c4c09.log
 identical(get_log_file(), log_path)
 #> [1] TRUE
 ```
