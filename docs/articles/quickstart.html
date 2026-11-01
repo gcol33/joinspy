@@ -457,13 +457,13 @@ space, a zero-width space from PDF copy-paste.</p>
 <span><span class="co">#&gt; right_join: <span style="color: #0000BB;">3</span></span></span>
 <span><span class="co">#&gt; full_join: <span style="color: #0000BB;">4</span></span></span></code></pre></div>
 <p>The zero-width space appended to <code>"SKU-003"</code> is invisible
-when printed but prevents the match. joinspy scans for the usual
-suspects: zero-width space (U+200B), zero-width non-joiner (U+200C),
-zero-width joiner (U+200D), byte order mark (U+FEFF), and non-breaking
-space (U+00A0). Columns that mix declared encodings are flagged as well.
-These characters typically arrive via copy-paste from PDFs or web pages,
-or from files saved with a byte order mark, so an encoding flag is often
-a hint about an upstream pipeline step worth checking.</p>
+when printed but prevents the match. joinspy scans for five characters:
+zero-width space (U+200B), zero-width non-joiner (U+200C), zero-width
+joiner (U+200D), byte order mark (U+FEFF), and non-breaking space
+(U+00A0). Columns that mix declared encodings are flagged as well. These
+characters typically arrive via copy-paste from PDFs or web pages, or
+from files saved with a byte order mark, so an encoding flag is often a
+hint about an upstream pipeline step worth checking.</p>
 </div>
 <div class="section level3">
 <h3 id="near-matches">Near Matches<a class="anchor" aria-label="anchor" href="#near-matches"></a>
@@ -673,8 +673,8 @@ contains an NA in any component is treated as having an NA key, matching
 how joins treat missing key components.</p>
 <p>What to do about duplicates depends on what they mean. When the
 duplicates are legitimate detail rows (multiple transactions per store),
-the usual move is to aggregate to the key level before joining, or to
-keep the detail and declare the relationship with
+we either aggregate to the key level before joining or keep the detail
+and declare the relationship with
 <code>join_strict(..., expect = "n:1")</code> so the expansion is
 explicit. When the duplicates are accidental (a double-loaded file, a
 botched append), deduplicate first; <code>keep = "first"</code> gives a
@@ -980,8 +980,8 @@ never match anything. Converting makes the missingness explicit.</p>
 whitespace, case, invisible characters, empty strings. It does not fix
 typos, semantic mismatches, or different key formats (<code>"USA"</code>
 vs. <code>"United States"</code>). Typos surface in the report as near
-matches and need human judgment, since an automated fix could merge keys
-that are genuinely distinct. Format mismatches need a recoding table.
+matches and need human judgment, since an automated fix could merge two
+distinct keys. Format mismatches need a recoding table.
 <code><a href="../articles/common-issues.html">vignette("common-issues")</a></code> walks through both, alongside the
 rest of the problem catalogue.</p>
 </div>
@@ -1651,7 +1651,7 @@ object.</p>
 <code class="sourceCode R"><span><span class="va">report</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/join_spy.html">join_spy</a></span><span class="op">(</span><span class="va">patients</span>, <span class="va">labs</span>, by <span class="op">=</span> <span class="st">"patient_id"</span><span class="op">)</span></span>
 <span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">tmp</span>, timestamp <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84542549d.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef3841cc865ce.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Join Key: patient_id</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -1669,7 +1669,7 @@ as structured fields:</p>
 <div class="sourceCode" id="cb50"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tmp_json</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".json"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/log_report.html">log_report</a></span><span class="op">(</span><span class="va">report</span>, <span class="va">tmp_json</span>, timestamp <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac842b16320b.json</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Report logged to <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38417ce78c.json</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/readLines.html" class="external-link">readLines</a></span><span class="op">(</span><span class="va">tmp_json</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">8</span><span class="op">]</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; {</span></span>
 <span><span class="co">#&gt;   "by": "patient_id",</span></span>
@@ -1693,7 +1693,7 @@ currently configured path, or <code>NULL</code> when logging is off.</p>
 <div class="sourceCode" id="cb51"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">log_path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".log"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/set_log_file.html">set_log_file</a></span><span class="op">(</span><span class="va">log_path</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84101e1e5f.log</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Automatic logging enabled: <span style="color: #0000BB;">C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38453273e1d.log</span></span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="../reference/get_log_file.html">get_log_file</a></span><span class="op">(</span><span class="op">)</span>, <span class="va">log_path</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">

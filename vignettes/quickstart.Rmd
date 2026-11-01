@@ -166,7 +166,7 @@ clean_ids <- data.frame(
 join_spy(raw_ids, clean_ids, by = "product_id")
 ```
 
-The zero-width space appended to `"SKU-003"` is invisible when printed but prevents the match. joinspy scans for the usual suspects: zero-width space (U+200B), zero-width non-joiner (U+200C), zero-width joiner (U+200D), byte order mark (U+FEFF), and non-breaking space (U+00A0). Columns that mix declared encodings are flagged as well. These characters typically arrive via copy-paste from PDFs or web pages, or from files saved with a byte order mark, so an encoding flag is often a hint about an upstream pipeline step worth checking.
+The zero-width space appended to `"SKU-003"` is invisible when printed but prevents the match. joinspy scans for five characters: zero-width space (U+200B), zero-width non-joiner (U+200C), zero-width joiner (U+200D), byte order mark (U+FEFF), and non-breaking space (U+00A0). Columns that mix declared encodings are flagged as well. These characters typically arrive via copy-paste from PDFs or web pages, or from files saved with a byte order mark, so an encoding flag is often a hint about an upstream pipeline step worth checking.
 
 ### Near Matches
 
@@ -255,7 +255,7 @@ key_duplicates(transactions, by = "store_id", keep = "first")
 
 `key_duplicates()` also takes composite keys (`by = c("store_id", "day")`), in which case a row counts as a duplicate only when all key columns repeat together. A row whose key contains an NA in any component is treated as having an NA key, matching how joins treat missing key components.
 
-What to do about duplicates depends on what they mean. When the duplicates are legitimate detail rows (multiple transactions per store), the usual move is to aggregate to the key level before joining, or to keep the detail and declare the relationship with `join_strict(..., expect = "n:1")` so the expansion is explicit. When the duplicates are accidental (a double-loaded file, a botched append), deduplicate first; `keep = "first"` gives a quick way to pick a representative row, though deciding which row to trust is a data question, and the answer belongs in the script rather than in a silent default.
+What to do about duplicates depends on what they mean. When the duplicates are legitimate detail rows (multiple transactions per store), we either aggregate to the key level before joining or keep the detail and declare the relationship with `join_strict(..., expect = "n:1")` so the expansion is explicit. When the duplicates are accidental (a double-loaded file, a botched append), deduplicate first; `keep = "first"` gives a quick way to pick a representative row, though deciding which row to trust is a data question, and the answer belongs in the script rather than in a silent default.
 
 ## The JoinReport Object
 
@@ -381,7 +381,7 @@ The `empty_to_na` flag converts empty strings to `NA`. The distinction matters f
 
 ### What Repair Does Not Fix
 
-`join_repair()` fixes mechanical string problems: whitespace, case, invisible characters, empty strings. It does not fix typos, semantic mismatches, or different key formats (`"USA"` vs. `"United States"`). Typos surface in the report as near matches and need human judgment, since an automated fix could merge keys that are genuinely distinct. Format mismatches need a recoding table. `vignette("common-issues")` walks through both, alongside the rest of the problem catalogue.
+`join_repair()` fixes mechanical string problems: whitespace, case, invisible characters, empty strings. It does not fix typos, semantic mismatches, or different key formats (`"USA"` vs. `"United States"`). Typos surface in the report as near matches and need human judgment, since an automated fix could merge two distinct keys. Format mismatches need a recoding table. `vignette("common-issues")` walks through both, alongside the rest of the problem catalogue.
 
 ### Repair Suggestions from a Report
 

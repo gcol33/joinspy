@@ -398,7 +398,7 @@ join_spy(raw_ids, clean_ids, by = "product_id")
 ```
 
 The zero-width space appended to `"SKU-003"` is invisible when printed
-but prevents the match. joinspy scans for the usual suspects: zero-width
+but prevents the match. joinspy scans for five characters: zero-width
 space (U+200B), zero-width non-joiner (U+200C), zero-width joiner
 (U+200D), byte order mark (U+FEFF), and non-breaking space (U+00A0).
 Columns that mix declared encodings are flagged as well. These
@@ -630,14 +630,13 @@ key, matching how joins treat missing key components.
 
 What to do about duplicates depends on what they mean. When the
 duplicates are legitimate detail rows (multiple transactions per store),
-the usual move is to aggregate to the key level before joining, or to
-keep the detail and declare the relationship with
-`join_strict(..., expect = "n:1")` so the expansion is explicit. When
-the duplicates are accidental (a double-loaded file, a botched append),
-deduplicate first; `keep = "first"` gives a quick way to pick a
-representative row, though deciding which row to trust is a data
-question, and the answer belongs in the script rather than in a silent
-default.
+we either aggregate to the key level before joining or keep the detail
+and declare the relationship with `join_strict(..., expect = "n:1")` so
+the expansion is explicit. When the duplicates are accidental (a
+double-loaded file, a botched append), deduplicate first;
+`keep = "first"` gives a quick way to pick a representative row, though
+deciding which row to trust is a data question, and the answer belongs
+in the script rather than in a silent default.
 
 ## The JoinReport Object
 
@@ -913,8 +912,8 @@ fixes mechanical string problems: whitespace, case, invisible
 characters, empty strings. It does not fix typos, semantic mismatches,
 or different key formats (`"USA"` vs. `"United States"`). Typos surface
 in the report as near matches and need human judgment, since an
-automated fix could merge keys that are genuinely distinct. Format
-mismatches need a recoding table.
+automated fix could merge two distinct keys. Format mismatches need a
+recoding table.
 [`vignette("common-issues")`](https://gillescolling.com/joinspy/articles/common-issues.md)
 walks through both, alongside the rest of the problem catalogue.
 
@@ -1684,7 +1683,7 @@ machine-readable output, and `.rds` for the complete R object.
 report <- join_spy(patients, labs, by = "patient_id")
 tmp <- tempfile(fileext = ".log")
 log_report(report, tmp, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84542549d.log
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef3841cc865ce.log
 cat(readLines(tmp)[1:8], sep = "\n")
 #> Join Key: patient_id
 #> 
@@ -1705,7 +1704,7 @@ history. The JSON format carries the same numbers as structured fields:
 
 tmp_json <- tempfile(fileext = ".json")
 log_report(report, tmp_json, timestamp = FALSE)
-#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac842b16320b.json
+#> ✔ Report logged to C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38417ce78c.json
 cat(readLines(tmp_json)[1:8], sep = "\n")
 #> {
 #>   "by": "patient_id",
@@ -1739,7 +1738,7 @@ returns the currently configured path, or `NULL` when logging is off.
 
 log_path <- tempfile(fileext = ".log")
 set_log_file(log_path)
-#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\RtmpOupTDJ\fileac84101e1e5f.log
+#> ℹ Automatic logging enabled: C:\Users\GILLES~1\AppData\Local\Temp\Rtmp8wFXeU\filef38453273e1d.log
 identical(get_log_file(), log_path)
 #> [1] TRUE
 ```
