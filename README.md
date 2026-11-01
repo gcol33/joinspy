@@ -22,11 +22,12 @@ joinspy checks the key columns of two tables before they are joined and
 reports the values that will not match, such as keys with a trailing
 space, a different case or an invisible Unicode character.
 
-R compares join keys byte by byte, so `"B "` and `"B"` are different
-keys and the join drops the row without a warning. The diagnostic report
-names each affected value, says why it fails to match and predicts the
-row count of every join type. You can then preview the repairs, apply
-them, or copy the generated code into your own script. joinspy supports:
+R compares join keys byte by byte, so a key with a trailing space never
+matches its trimmed counterpart and the join drops the row without a
+warning. The diagnostic report names each affected value, says why it
+fails to match and predicts the row count of every join type. You can
+then preview the repairs, apply them, or copy the generated code into
+your own script. joinspy supports:
 
 - **Repairing keys.**
   [`join_repair()`](https://gillescolling.com/joinspy/reference/join_repair.html)
@@ -202,7 +203,7 @@ join_explain(result, orders, customers, by = "id", type = "left")
 
 | Package | Focus |
 |----|----|
-| [dplyr](https://dplyr.tidyverse.org/) 1.1+ | Cardinality checks via the `relationship` argument |
+| [dplyr](https://dplyr.tidyverse.org/) | Cardinality checks via the `relationship` argument of its join functions |
 | [powerjoin](https://github.com/moodymudskipper/powerjoin) | Configurable join checks and key preprocessing |
 | [joyn](https://github.com/randrescastaneda/joyn) | Per-row match-status reporting variable |
 | [tidylog](https://github.com/elbersb/tidylog) | Logs row count changes after joins |
